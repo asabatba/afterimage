@@ -95,6 +95,7 @@ export class AudioEngine {
   private stretchInUse = false;
   private scratch = new Float32Array(2048);
   private auditionSrc: AudioBufferSourceNode | null = null;
+  private auditionInfo: { id: string; t0: number; from: number; to: number; loop: boolean } | null = null;
   private listeners = new Set<(playing: boolean) => void>();
 
   constructor(readonly ctx: BaseAudioContext, readonly host: EngineHost) {
@@ -523,7 +524,8 @@ export class AudioEngine {
     osc.stop(t + 0.06);
   }
 
-  async auditionSample(id: string, from = 0, to?: number) {
+  /** Preview [from, to] of a sample on the cue route (never captured); `loop` repeats it until stopped. */
+  async auditionSample(id: string, from = 0, to?: number, loop = false) {
     this.stopAudition();
     const s = this.host.samples.get(id);
     if (!s) return;
@@ -531,12 +533,23 @@ export class AudioEngine {
     const src = this.ctx.createBufferSource();
     src.buffer = s.buffer;
     src.connect(this.graph.cue);
+    const end = to ?? s.buffer.duration;
+    const looping = loop && end - from > 0.01;
+    if (looping) {
+      src.loop = true;
+      src.loopStart = from;
+      src.loopEnd = end;
+    }
     const t = this.ctx.currentTime + 0.01;
-    src.start(t, from, to !== undefined ? Math.max(0.001, to - from) : undefined);
+    src.start(t, from, looping || to === undefined ? undefined : Math.max(0.001, to - from));
     src.onended = () => {
-      if (this.auditionSrc === src) this.auditionSrc = null;
+      if (this.auditionSrc === src) {
+        this.auditionSrc = null;
+        this.auditionInfo = null;
+      }
     };
     this.auditionSrc = src;
+    this.auditionInfo = { id, t0: t, from, to: end, loop: looping };
   }
 
   stopAudition() {
@@ -546,6 +559,18 @@ export class AudioEngine {
       /* ignore */
     }
     this.auditionSrc = null;
+    this.auditionInfo = null;
+  }
+
+  /** Where the running preview is, in seconds into its sample; null when nothing is playing. */
+  auditionPosition(id?: string): number | null {
+    const a = this.auditionInfo;
+    if (!a || (id !== undefined && a.id !== id)) return null;
+    const el = this.ctx.currentTime - a.t0;
+    if (el < 0) return a.from;
+    const len = a.to - a.from;
+    if (a.loop) return a.from + (el % len);
+    return el >= len ? null : a.from + el;
   }
 
   /** Play an instrument note on the cue route (never captured). Returns a release function. */

@@ -22,6 +22,24 @@ Targets current Chromium and Firefox desktop. Verified here in headless Chromium
   **Shift-drag** to slip content, **Alt-drag** body to copy, squares at the top corners for fades.
   `S` splits at the playhead, `Ctrl+D` duplicates, `Delete` removes. Two clips may overlap on a track and
   crossfade (equal power); a third layer belongs on another track.
+- **Copy, paste, repeat, fill**: `Ctrl+C` / `X` / `V` copy, cut and paste at the cursor (on the track you last clicked);
+  the cursor moves to the end of what you pasted, so pressing `Ctrl+V` again keeps going. The bar above the panel has
+  **Repeat ×N** (every clip length / 1 / 2 / 4 bars) and **Fill to** loop end, next section, song end or +8/16/32 bars (the
+  last copy is trimmed to fit). Drag the corner handle of a selected clip to repeat it as far as you like (Shift: fill
+  exactly to the pointer). *Loop it* sets the loop range around the selection.
+- **Zoom**: `Fit` (or `Z` with nothing selected) shows the whole song; `Z` with clips selected zooms to them.
+- **Sample editor** (click a pool sample, or *Edit*; importing a single file opens it): a zoomable waveform of one
+  sample — `Ctrl`+wheel or `+`/`−` zoom, wheel scrolls, the strip underneath is an overview you can drag. Opening a sample
+  analyses it (a few seconds for a song) and shows the **beat grid** (tempo and bar lines, editable: ×2, ÷2, *Downbeat +1*,
+  *Beat 1 ← cursor*), **hits** (sensitivity slider) and a **chord strip** with the **key**. Drag to select (snaps to the grid
+  or to hits; `Alt` for free; drag the edges to resize), double-click selects a beat/bar, click a chord to select it.
+  `Space` previews the selection (or from the cursor), `L` loops it, `←`/`→` step to the next region. The selection's
+  detected **note** (with cents) and **chord** are shown. **Add to timeline** (`Enter`) places it at the cursor and moves
+  the cursor on; **Add & next** (`Shift+Enter`) also selects the next region; **Slice → timeline** cuts the selection or the
+  whole song into bars, beats or hits and lays the pieces end to end; or drag the *Drag* handle onto a lane. A sample with a
+  beat grid places its clips in *Follow tempo* mode, so slices stay in time when the project tempo differs
+  (*Use as project tempo* matches them exactly). *Make instrument* tunes the root note to the detected pitch.
+- **Clip panel → Detect**: *Note & chord* for the clip's region, with *Tune to* the nearest note.
 - **Snap** toggles with `G`; hold `Ctrl` while dragging for free placement. `Ctrl`+wheel or `+`/`−` zooms.
 - **Ruler**: click/drag to move the cursor, drag the lower band for the loop range (`L` toggles), double-click the
   top band to add a section marker (`M` adds one at the cursor).
@@ -42,7 +60,8 @@ Targets current Chromium and Firefox desktop. Verified here in headless Chromium
 ## Architecture
 
 ```
-src/model/     pure, tested: types, timing math, clip edits, crossfades, tracker, playback planning, WAV, peaks, undo
+src/model/     pure, tested: types, timing math, clip edits (incl. repeat/fill/paste), crossfades, tracker, playback planning,
+               WAV, peaks, undo; analysis (onsets, tempo/beat grid, pitch, chords, key), beat-grid maths, chopping
 src/audio/     engine (transport + look-ahead scheduler), mixer graph, stretch pool, tracker voices,
                capture (recorder worklet → worker), offline export
 src/store/     Solid stores and undoable actions, Dexie persistence, fflate bundles, session recovery
@@ -82,6 +101,11 @@ internal preroll that is trimmed afterwards.
    stereo and record their source clips; cancel leaves the project unchanged.
 4. After reload all audio is restored from IndexedDB; a 2-minute export is 123.0 s with a 3 s tail and a
    kick at bar 60 lands within 3 ms.
+
+Analysis (`src/model/analysis.ts`) is tested on synthetic audio (click tracks, drum loops, chord progressions) and has not
+been tuned on a library of real recordings. It assumes a steady tempo and 4/4: tempo octave errors are possible (use ×2/÷2),
+the bar start is a guess from onsets and chord changes (use *Downbeat +1*), and chords are limited to major, minor, 7,
+maj7 and m7 triads/tetrads. Analysis runs on the main thread in short slices rather than in a worker.
 
 Not yet measured: CPU with many simultaneous stretched clips (each needs its own node) and drum/chord/texture
 quality beyond the synthetic fixtures. Deferred per spec: mobile, MIDI, plugins, collaboration, session

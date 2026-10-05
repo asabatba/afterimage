@@ -12,7 +12,9 @@ import {
   formatBBT,
 } from '../model/timing';
 import { beginGesture, endGesture, live, project, samples, samplesVersion, playhead, playing } from '../store/app';
-import { instrumentFromClip, updateClip } from '../store/actions';
+import { instrumentFromClip, openSample, updateClip } from '../store/actions';
+import { detectRegion, type RegionInfo } from '../store/analysis';
+import { noteName } from '../model/tracker';
 import { NumberField, Segmented, Toggle, bindEdit, fmtSigned } from './controls';
 import { TRACK_COLORS, drawSampleWave, setupCanvas } from './draw';
 
@@ -35,6 +37,19 @@ export function ClipInspector(props: { clip: AudioClip }) {
   const track = () => project.tracks.find((t) => t.id === c().trackId);
 
   const set = (label: string, patch: Partial<AudioClip>) => updateClip(id(), label, (x) => ({ ...(x as AudioClip), ...patch }));
+
+  // Pitch and chord of the clip's region, on request.
+  const [found, setFound] = createSignal<RegionInfo | null>(null);
+  const [detecting, setDetecting] = createSignal(false);
+  createEffect(on([() => c().srcStart, () => c().srcEnd], () => setFound(null), { defer: true }));
+  const detect = async () => {
+    setDetecting(true);
+    try {
+      setFound(await detectRegion(c().sampleId, c().srcStart, c().srcEnd));
+    } finally {
+      setDetecting(false);
+    }
+  };
 
   const sourceInfo = () => {
     const m = meta();
@@ -190,6 +205,38 @@ export function ClipInspector(props: { clip: AudioClip }) {
             }
             title="Repeat the region to fill the clip; drag the right edge to extend"
           />
+        </fieldset>
+
+        <fieldset>
+          <legend>Detect</legend>
+          <button type="button" class="ghost" disabled={detecting()} onClick={() => void detect()} title="Find the pitch and the chord of this region">
+            {detecting() ? 'Listening…' : 'Note & chord'}
+          </button>
+          <Show when={found()}>
+            {(f) => (
+              <div class="chop-chips">
+                <span class="chip">
+                  Note <b>{f().note ? `${noteName(f().note!.midi)}${f().note!.cents ? ` ${fmtSigned(f().note!.cents)}¢` : ''}` : 'none'}</b>
+                </span>
+                <span class="chip">
+                  Chord <b>{f().chord ? f().chord!.name : 'none'}</b>
+                </span>
+                <Show when={f().note && f().note!.cents !== 0 && !c().repitch}>
+                  <button
+                    type="button"
+                    class="text-btn"
+                    onClick={() => set('tune to note', { cents: Math.max(-100, Math.min(100, -f().note!.cents)) })}
+                    title="Set the fine tune so this region sounds exactly on its nearest note"
+                  >
+                    Tune to {noteName(f().note!.midi)}
+                  </button>
+                </Show>
+              </div>
+            )}
+          </Show>
+          <button type="button" class="ghost" onClick={() => openSample(c().sampleId)} title="Zoom, find beats and cut more pieces from this sample">
+            Open sample
+          </button>
         </fieldset>
 
         <div class="insp-actions">

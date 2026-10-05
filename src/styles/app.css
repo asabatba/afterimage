@@ -1738,3 +1738,375 @@ fieldset .slider {
     scroll-behavior: auto !important;
   }
 }
+
+/* ── Sample editor (chop) ────────────────────────────────────────────── */
+.chop {
+  display: grid;
+  grid-template-columns: minmax(320px, 1fr) minmax(300px, 400px);
+  gap: 20px;
+  padding: 12px 18px;
+  min-height: 100%;
+  outline: none;
+}
+.chop:focus-visible {
+  box-shadow: inset 0 0 0 1px var(--rule);
+}
+.chop-main {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.chop-title {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  min-width: 0;
+}
+.chop-name {
+  font-size: var(--fs-l);
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.chop-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.chop-toolbar .toggle,
+.chop-toolbar .segmented button {
+  padding: 2px 8px;
+  font-size: var(--fs-s);
+}
+.chop-sep {
+  width: 1px;
+  align-self: stretch;
+  background: var(--rule);
+  margin: 2px 4px;
+}
+.chop-chords {
+  position: relative;
+  height: 20px;
+  background: var(--ground-sunk);
+  border: 1px solid var(--rule-soft);
+  overflow: hidden;
+}
+.chord {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border: none;
+  border-right: 1px solid var(--ground-sunk);
+  background: var(--amber-fill);
+  color: var(--amber-ink);
+  font: 500 11px var(--mono);
+  padding: 0 4px;
+  text-align: left;
+  overflow: hidden;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.chord.minor {
+  background: var(--blue-fill);
+  color: var(--blue-ink);
+}
+.chord:hover {
+  filter: brightness(1.3);
+}
+.chop-wave {
+  position: relative;
+  background: var(--ground-sunk);
+  border: 1px solid var(--rule-soft);
+  overflow: hidden;
+  cursor: crosshair;
+  touch-action: none;
+  user-select: none;
+}
+.chop-wave canvas {
+  position: absolute;
+  inset: 0;
+}
+.chop-sel {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: rgba(191, 145, 82, 0.2);
+  border-left: 1px solid var(--amber);
+  border-right: 1px solid var(--amber);
+  pointer-events: none;
+}
+.chop-edge {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 12px;
+  pointer-events: auto;
+  cursor: ew-resize;
+}
+.chop-edge.a {
+  left: -6px;
+}
+.chop-edge.b {
+  right: -6px;
+}
+.chop-edge::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  width: 8px;
+  height: 8px;
+  background: var(--amber);
+}
+.chop-edge.a::before {
+  left: 6px;
+}
+.chop-edge.b::before {
+  right: 6px;
+}
+.chop-cursor {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--amber-ink);
+  pointer-events: none;
+}
+.chop-playhead {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--ink);
+  pointer-events: none;
+}
+.chop-missing {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--ink-3);
+}
+.chop-overview {
+  position: relative;
+  background: var(--ground-sunk);
+  border: 1px solid var(--rule-soft);
+  cursor: pointer;
+  touch-action: none;
+  overflow: hidden;
+}
+.chop-overview canvas {
+  position: absolute;
+  inset: 0;
+  opacity: 0.7;
+}
+.chop-viewport {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  min-width: 3px;
+  border: 1px solid var(--ink-3);
+  background: rgba(237, 230, 214, 0.08);
+  pointer-events: none;
+}
+.chop-ov-sel {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: rgba(191, 145, 82, 0.35);
+  pointer-events: none;
+}
+.chop-hint {
+  color: var(--ink-4);
+}
+.chop-side {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+.chop-note {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  color: var(--ink-3);
+  font-size: var(--fs-s);
+}
+.chop-btns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+  flex-basis: 100%;
+}
+.chop-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.chip {
+  font-size: var(--fs-s);
+  color: var(--ink-3);
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  padding: 2px 8px;
+  white-space: nowrap;
+}
+.chip b {
+  font: 500 var(--fs-m) var(--mono);
+  color: var(--ink);
+  margin-left: 4px;
+}
+.chop-progress {
+  position: relative;
+  flex-basis: 100%;
+  height: 18px;
+  background: var(--ground-sunk);
+  border: 1px solid var(--rule-soft);
+  overflow: hidden;
+}
+.chop-progress > div {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--amber-fill);
+  border-right: 1px solid var(--amber);
+}
+.chop-progress > span {
+  position: relative;
+  padding: 0 8px;
+  font-size: var(--fs-xs);
+  line-height: 16px;
+  color: var(--ink-2);
+}
+.chop-drag {
+  border: 1px dashed var(--ink-4);
+  border-radius: var(--r);
+  padding: 4px 10px;
+  color: var(--ink-2);
+  cursor: grab;
+  user-select: none;
+  white-space: nowrap;
+}
+.chop-drag:hover {
+  border-color: var(--amber);
+  color: var(--amber-ink);
+}
+.chop-slice {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  flex-basis: 100%;
+}
+.pool-kind.grid {
+  color: var(--amber-ink);
+  border-color: var(--amber);
+}
+
+/* ── Clip tools, repeat handle ───────────────────────────────────────── */
+.clip-tools {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  align-self: center;
+  margin-right: 8px;
+}
+.tool-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.tool-label {
+  font-size: var(--fs-xs);
+  color: var(--ink-3);
+}
+.clip-tools select {
+  padding: 2px 4px;
+  font-size: var(--fs-s);
+}
+.count-input {
+  width: 4.2ch;
+  background: var(--ground-sunk);
+  border: 1px solid var(--rule);
+  border-radius: var(--r);
+  padding: 2px 4px;
+  font: 500 var(--fs-s) var(--mono);
+  text-align: right;
+}
+.fill-handle {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 12px;
+  height: 12px;
+  background: var(--clip-ink);
+  cursor: e-resize;
+  z-index: 3;
+  clip-path: polygon(100% 0, 100% 100%, 0 100%);
+  opacity: 0.9;
+}
+.fill-handle:hover {
+  opacity: 1;
+  width: 16px;
+  height: 16px;
+}
+body[data-dragging='fill'] {
+  cursor: e-resize;
+}
+.track-head.active .track-name {
+  color: var(--ink);
+}
+.track-head.active {
+  box-shadow: inset 0 -2px 0 var(--track-color);
+}
+@media (max-width: 1280px) {
+  .tool-label {
+    display: none;
+  }
+}
+
+/* Two-column side panel: actions first, so they are visible without scrolling. */
+.chop {
+  grid-template-columns: minmax(300px, 1fr) minmax(300px, 540px);
+}
+.chop-side {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  align-content: start;
+  align-items: start;
+  gap: 12px 20px;
+}
+.pool-meta {
+  flex-wrap: wrap;
+  row-gap: 2px;
+}
+.pool-kind {
+  white-space: nowrap;
+}
+.chop-views {
+  margin-left: auto;
+  display: inline-flex;
+  gap: 4px;
+  flex: none;
+}
+.chop-views .toggle {
+  padding: 1px 8px;
+  font-size: var(--fs-s);
+}
+.chop-drag {
+  padding: 2px 8px;
+  font-size: var(--fs-s);
+}
+.chop-side .insp-actions {
+  flex-basis: 100%;
+}
+.chop-side fieldset {
+  min-width: 0;
+}
+.chop {
+  grid-template-columns: minmax(0, 1fr) clamp(300px, 36vw, 540px);
+}

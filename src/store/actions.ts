@@ -1,10 +1,13 @@
 // User-level operations. Every edit goes through commit()/gestures so it is undoable.
+import { createSignal } from 'solid-js';
 import { unwrap } from 'solid-js/store';
-import type { AudioClip, Clip, Instrument, Pattern, PatternClip, Project, SampleKind, SampleMeta, SampleSourceRef, Track } from '../model/types';
+import type { AudioClip, BeatGrid, Clip, Instrument, Pattern, PatternClip, Project, SampleKind, SampleMeta, SampleSourceRef, Track } from '../model/types';
 import { createAudioClip, createInstrument, createPatternClip, createTrack, newId } from '../model/project';
-import { clonePattern, createPattern } from '../model/tracker';
-import { BEATS_PER_BAR, clipEnd, normalizeClip, snapBeat } from '../model/timing';
-import { duplicateClip, songEnd, splitClip } from '../model/clips';
+import { clonePattern, createPattern, noteName } from '../model/tracker';
+import { BEATS_PER_BAR, EPS, clipEnd, normalizeClip, snapBeat } from '../model/timing';
+import { duplicateClip, fillClips, groupSpan, pasteClips, repeatClips, songEnd, splitClip } from '../model/clips';
+import { regionClip, sliceClips } from '../model/chop';
+import { detectNote } from '../model/analysis';
 import { encodeWav, type WavFormat } from '../model/wav';
 import { bufferFromChannels, channelsOf } from '../audio/samples';
 import { renderOffline } from '../audio/export';
@@ -17,6 +20,7 @@ import {
   playhead,
   project,
   samples,
+  selectClips,
   selectedClipIds,
   setPlayhead,
   setUi,
@@ -77,8 +81,27 @@ export async function importFiles(files: File[], place?: { trackId: string; beat
       toast(`Couldn’t decode “${f.name}” — ${e?.message ?? 'unsupported format'}.`, 'error');
     }
   }
-  if (metas.length && !place) toast(`Imported ${metas.length} sample${metas.length > 1 ? 's' : ''}. Drag them onto a track.`);
+  if (metas.length === 1 && !place) {
+    openSample(metas[0].id);
+    toast(`Imported “${metas[0].name}” and opened it in the sample editor — select a region to place it, or slice it.`);
+  } else if (metas.length && !place) toast(`Imported ${metas.length} sample${metas.length > 1 ? 's' : ''}. Drag them onto a track.`);
   return metas;
+}
+
+/** Show a pool sample in the sample editor (bottom panel). */
+export function openSample(id: string) {
+  setUi('selection', { kind: 'sample', id });
+  setUi({ bottomOpen: true, bottomTab: 'detail', bottomHeight: Math.max(ui.bottomHeight, 400) });
+}
+
+/** Set (or clear) a sample's beat grid. */
+export function setSampleGrid(id: string, grid: BeatGrid | undefined, label = 'edit beat grid') {
+  commit(label, (p) => {
+    const s = p.samples.find((x) => x.id === id);
+    if (!s) return;
+    if (grid) s.grid = { bpm: Math.round(grid.bpm * 1000) / 1000, offset: grid.offset };
+    else delete s.grid;
+  }, { checkOverlaps: false });
 }
 
 export function renameSample(id: string, name: string) {
@@ -111,10 +134,78 @@ export function removeSample(id: string) {
 export function addClipFromSample(sampleId: string, trackId: string, beat: number, extra: Partial<AudioClip> = {}): AudioClip | null {
   const meta = project.samples.find((s) => s.id === sampleId);
   if (!meta) return null;
-  const clip = createAudioClip(meta, trackId, Math.max(0, beat), project.bpm, extra);
+  // A sample with a beat grid follows the project tempo, so it stays in time wherever it is placed.
+  const grid: Partial<AudioClip> = meta.grid ? { timing: 'tempo', sourceBpm: meta.grid.bpm } : {};
+  const clip = createAudioClip(meta, trackId, Math.max(0, beat), project.bpm, { ...grid, ...extra });
   const ok = commit(`place ${meta.name}`, (p) => p.clips.push(clip));
-  if (ok) setUi('selection', { kind: 'clips', ids: [clip.id] });
+  if (ok) {
+    setUi('selection', { kind: 'clips', ids: [clip.id] });
+    setUi('activeTrackId', trackId);
+  }
   return ok ? clip : null;
+}
+
+// ── Chopping: regions and slices of a long sample ────────────────────────
+
+/** First track (starting at `preferred`) with no clip overlapping [start, end). */
+function trackWithRoom(preferred: string | null | undefined, start: number, end: number): string | null {
+  const ids = project.tracks.map((t) => t.id);
+  const from = Math.max(0, ids.indexOf(preferred ?? ''));
+  for (const id of [...ids.slice(from), ...ids.slice(0, from)]) {
+    if (!project.clips.some((c) => c.trackId === id && c.start < end - EPS && clipEnd(c) > start + EPS)) return id;
+  }
+  return null;
+}
+
+/** Move the insertion point (without disturbing playback). */
+function moveCursor(beat: number) {
+  setUi('cursor', beat);
+  if (!audio().engine.playing) setPlayhead(beat);
+}
+
+/** Place [from, to] of a sample at the cursor (or `beat`), then advance the cursor so the next one follows. */
+export function placeRegion(sampleId: string, from: number, to: number, opts: { trackId?: string; beat?: number } = {}) {
+  const meta = project.samples.find((s) => s.id === sampleId);
+  if (!meta) return null;
+  const beat = Math.max(0, opts.beat ?? ui.cursor);
+  const probe = regionClip(meta, from, to, '', beat, project.bpm);
+  const trackId = opts.trackId ?? trackWithRoom(ui.activeTrackId ?? ui.capture.destTrackId, beat, beat + probe.length);
+  if (!trackId) {
+    toast('No track has room at the cursor — move the cursor or clear some space.', 'warn');
+    return null;
+  }
+  const clip = { ...probe, trackId };
+  if (!commit(`place ${clip.name}`, (p) => p.clips.push(clip))) return null;
+  // The selection stays on the sample so the editor remains open for the next piece.
+  setUi('activeTrackId', trackId);
+  moveCursor(clipEnd(clip));
+  return clip;
+}
+
+/** Place consecutive pieces cut at `bounds`, end to end from the cursor. */
+export function sliceToTrack(sampleId: string, bounds: number[], opts: { trackId?: string; beat?: number } = {}) {
+  const meta = project.samples.find((s) => s.id === sampleId);
+  if (!meta || bounds.length < 2) return toast('Nothing to slice here — widen the selection or change the slice size.', 'warn');
+  const beat = Math.max(0, opts.beat ?? ui.cursor);
+  const probe = sliceClips(meta, bounds, '', beat, project.bpm);
+  const end = probe.length ? clipEnd(probe[probe.length - 1]) : beat;
+  const trackId = opts.trackId ?? trackWithRoom(ui.activeTrackId ?? ui.capture.destTrackId, beat, end);
+  if (!trackId) return toast('No track has room for the slices at the cursor — move the cursor or clear some space.', 'warn');
+  const clips = probe.map((c) => ({ ...c, trackId }));
+  if (!commit(`slice ${meta.name} into ${clips.length}`, (p) => p.clips.push(...clips))) return;
+  setUi('activeTrackId', trackId);
+  moveCursor(end);
+  toast(`Placed ${clips.length} slices on ${project.tracks.find((t) => t.id === trackId)?.name ?? 'a track'}.`, 'info', 2500);
+}
+
+/** Drop a region of a sample onto a lane at a beat (drag from the sample editor). */
+export function addRegionClip(sampleId: string, from: number, to: number, trackId: string, beat: number) {
+  const meta = project.samples.find((s) => s.id === sampleId);
+  if (!meta) return null;
+  const clip = regionClip(meta, from, to, trackId, Math.max(0, beat), project.bpm);
+  if (!commit(`place ${clip.name}`, (p) => p.clips.push(clip))) return null;
+  setUi('activeTrackId', trackId);
+  return clip;
 }
 
 export function addPatternClip(trackId: string, beat: number) {
@@ -160,6 +251,119 @@ export function duplicateSelected() {
   const shift = end - start;
   const copies = sel.map((c) => duplicateClip(unwrap(c), c.start + shift));
   if (commit('duplicate', (p) => p.clips.push(...copies))) setUi('selection', { kind: 'clips', ids: copies.map((c) => c.id) });
+}
+
+// ── Copy, paste, repeat, fill ────────────────────────────────────────────
+
+interface ClipboardData {
+  clips: Clip[];
+  patterns: Pattern[];
+}
+let clipboard: ClipboardData | null = null;
+const [clipboardCount, setClipboardCount] = createSignal(0);
+/** Reactive: how many clips are on the clipboard. */
+export { clipboardCount };
+
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
+
+const selectedClips = (): Clip[] =>
+  project.clips.filter((c) => selectedClipIds().includes(c.id)).map((c) => structuredClone(unwrap(c)) as Clip);
+
+export function copySelected(quiet = false): boolean {
+  const clips = selectedClips();
+  if (!clips.length) return false;
+  const used = new Set(clips.filter((c): c is PatternClip => c.kind === 'pattern').map((c) => c.patternId));
+  clipboard = { clips, patterns: project.patterns.filter((p) => used.has(p.id)).map((p) => structuredClone(unwrap(p))) };
+  setClipboardCount(clips.length);
+  if (!quiet) toast(`Copied ${plural(clips.length, 'clip')}. Ctrl+V pastes at the cursor; paste again to keep going.`, 'info', 1800);
+  return true;
+}
+
+export function cutSelected() {
+  if (!copySelected(true)) return;
+  const n = clipboardCount();
+  deleteSelected();
+  toast(`Cut ${plural(n, 'clip')}.`, 'info', 1500);
+}
+
+/** Paste at the cursor (or `beat`). The cursor then moves to the end of the pasted clips, so pasting again continues. */
+export function pasteClipboard(beat?: number) {
+  if (!clipboard) return toast('Nothing to paste — copy some clips first (Ctrl+C).', 'info', 1800);
+  const ids = project.tracks.map((t) => t.id);
+  const rows = clipboard.clips.map((c) => Math.max(0, ids.indexOf(c.trackId)));
+  const anchor = ids.indexOf(ui.activeTrackId ?? '');
+  const at = Math.max(0, beat ?? (audio().engine.playing ? playhead() : ui.cursor));
+  const copies = pasteClips(clipboard.clips, at, ids, anchor >= 0 ? anchor - Math.min(...rows) : 0);
+  const pats = clipboard.patterns;
+  const ok = commit(`paste ${plural(copies.length, 'clip')}`, (p) => {
+    for (const pat of pats) if (!p.patterns.some((x) => x.id === pat.id)) p.patterns.push(structuredClone(pat));
+    p.clips.push(...copies);
+  });
+  if (!ok) return;
+  selectClips(copies.map((c) => c.id));
+  setUi('activeTrackId', copies[0]?.trackId ?? ui.activeTrackId);
+  moveCursor(groupSpan(copies).end);
+}
+
+/** Repeat step in beats, never smaller than the group (copies must not collide). */
+function repeatStep(group: Clip[]): number | undefined {
+  const unit = { auto: 0, bar: 4, bars2: 8, bars4: 16 }[ui.tools.step];
+  if (!unit) return undefined;
+  return Math.max(1, Math.ceil(groupSpan(group).length / unit - 1e-9)) * unit;
+}
+
+const sampleDurationOf = (c: Clip) => (c.kind === 'audio' ? project.samples.find((s) => s.id === c.sampleId)?.duration ?? Infinity : Infinity);
+
+export function repeatSelected(count = ui.tools.repeatCount) {
+  const group = selectedClips();
+  if (!group.length) return;
+  const copies = repeatClips(group, count, repeatStep(group));
+  if (!copies.length) return toast('Nothing to repeat.', 'info', 1500);
+  if (commit(`repeat ×${count}`, (p) => p.clips.push(...copies))) {
+    selectClips(copies.map((c) => c.id));
+    moveCursor(groupSpan(copies).end);
+  }
+}
+
+/** Where a fill should stop, in beats, or null if the target has no usable position. */
+export function fillTargetBeat(group: Clip[], target = ui.tools.fillTo): number | null {
+  const end = groupSpan(group).end;
+  const barEnd = Math.ceil(end / BEATS_PER_BAR - 1e-9) * BEATS_PER_BAR;
+  switch (target) {
+    case 'loop':
+      return project.loop.end;
+    case 'section':
+      return project.markers.find((m) => m.beat > end + EPS)?.beat ?? null;
+    case 'song':
+      return songEnd(project.clips);
+    case 'bars8':
+      return barEnd + 8 * BEATS_PER_BAR;
+    case 'bars16':
+      return barEnd + 16 * BEATS_PER_BAR;
+    case 'bars32':
+      return barEnd + 32 * BEATS_PER_BAR;
+  }
+}
+
+export function fillSelected(target = ui.tools.fillTo) {
+  const group = selectedClips();
+  if (!group.length) return;
+  const to = fillTargetBeat(group, target);
+  if (to === null) return toast('There is no later section marker to fill to — add one with M, or pick another target.', 'warn');
+  const copies = fillClips(group, to, project.bpm, sampleDurationOf, repeatStep(group), true);
+  if (!copies.length) return toast('Nothing to fill — the target is at or before the end of the selection.', 'info', 2200);
+  if (commit(`fill to beat ${Math.round(to * 100) / 100}`, (p) => p.clips.push(...copies))) {
+    selectClips(copies.map((c) => c.id));
+    moveCursor(groupSpan(copies).end);
+  }
+}
+
+/** Set the loop range around the selected clips and switch looping on. */
+export function loopToSelection() {
+  const group = selectedClips();
+  if (!group.length) return;
+  const { start, end } = groupSpan(group);
+  setLoop({ start, end, enabled: true });
 }
 
 export function splitAt(beat: number) {
@@ -281,25 +485,48 @@ export function setBpm(bpm: number) {
 
 // ── Instruments ──────────────────────────────────────────────────────────
 
+/**
+ * Tune an instrument to a region's detected pitch: the root note becomes the detected note and the fine
+ * tune corrects its detuning, so that key sounds in tune. Unpitched audio keeps the defaults.
+ */
+function tuneToRegion(ins: Instrument, from: number, to: number): string {
+  const loaded = samples.get(ins.sampleId);
+  const n = loaded && detectNote(channelsOf(loaded.buffer), loaded.buffer.sampleRate, from, to);
+  if (!n || n.clarity < 0.85 || n.midi < 0 || n.midi > 127) return '';
+  ins.rootNote = n.midi;
+  ins.fineTune = Math.max(-100, Math.min(100, -n.cents));
+  return ` Root set to ${noteName(n.midi)} (detected${n.cents ? `, ${n.cents > 0 ? '+' : ''}${n.cents} ct` : ''}).`;
+}
+
 export function instrumentFromSample(sampleId: string): Instrument | null {
   const meta = project.samples.find((s) => s.id === sampleId);
   if (!meta) return null;
   const ins = createInstrument(meta);
+  const note = tuneToRegion(ins, 0, meta.duration);
   commit('new instrument', (p) => p.instruments.push(ins), { checkOverlaps: false });
   setUi('tracker', 'instrumentId', ins.id);
   setUi('selection', { kind: 'instrument', id: ins.id });
+  if (note) toast(`Instrument “${ins.name}” created.${note}`, 'info', 3000);
   return ins;
 }
 
 /** Make an instrument from an audio clip's region. */
 export function instrumentFromClip(clipId: string) {
   const c = project.clips.find((x) => x.id === clipId) as AudioClip | undefined;
-  const meta = c && project.samples.find((s) => s.id === c.sampleId);
-  if (!c || !meta) return;
-  const ins = { ...createInstrument(meta, c.name ?? meta.name), start: c.srcStart, end: c.srcEnd, loopStart: c.srcStart, loopEnd: c.srcEnd };
+  if (!c) return;
+  instrumentFromRegion(c.sampleId, c.srcStart, c.srcEnd, c.name);
+}
+
+/** Make an instrument from any region of a sample. */
+export function instrumentFromRegion(sampleId: string, from: number, to: number, name?: string) {
+  const meta = project.samples.find((s) => s.id === sampleId);
+  if (!meta) return;
+  const ins = { ...createInstrument(meta, name ?? meta.name), start: from, end: to, loopStart: from, loopEnd: to };
+  const note = tuneToRegion(ins, from, to);
   commit('new instrument', (p) => p.instruments.push(ins), { checkOverlaps: false });
   setUi('tracker', 'instrumentId', ins.id);
   setUi('selection', { kind: 'instrument', id: ins.id });
+  if (note) toast(`Instrument “${ins.name}” created.${note}`, 'info', 3000);
 }
 
 export function updateInstrument(id: string, label: string, patch: Partial<Instrument>) {

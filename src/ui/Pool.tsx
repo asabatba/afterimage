@@ -2,8 +2,8 @@ import { For, Show, createSignal } from 'solid-js';
 import type { SampleMeta } from '../model/types';
 import { hex2 } from '../model/tracker';
 import { audio, project, setUi, ui } from '../store/app';
-import { importFiles, instrumentFromSample, removeInstrument, removeSample, renameSample, sampleUsage } from '../store/actions';
-import { SAMPLE_MIME } from './Arrangement';
+import { importFiles, instrumentFromSample, openSample, removeInstrument, removeSample, renameSample, sampleUsage } from '../store/actions';
+import { SAMPLE_MIME } from './dnd';
 
 const fmtDur = (s: number) => (s < 10 ? `${s.toFixed(2)}s` : s < 60 ? `${s.toFixed(1)}s` : `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`);
 
@@ -124,6 +124,7 @@ function SampleRow(props: { s: SampleMeta; playing: boolean; onAudition: () => v
   return (
     <li
       class="pool-item sample"
+      classList={{ selected: ui.selection.kind === 'sample' && ui.selection.id === props.s.id }}
       draggable={!editing()}
       onDragStart={(e) => {
         e.dataTransfer!.setData(SAMPLE_MIME, props.s.id);
@@ -138,7 +139,12 @@ function SampleRow(props: { s: SampleMeta; playing: boolean; onAudition: () => v
         <Show
           when={editing()}
           fallback={
-            <span class="pool-name" onDblClick={() => setEditing(true)} title={`${props.s.name} — double-click to rename, drag onto a track`}>
+            <span
+              class="pool-name"
+              onClick={() => openSample(props.s.id)}
+              onDblClick={() => setEditing(true)}
+              title={`${props.s.name} — click to open in the sample editor, double-click to rename, drag onto a track`}
+            >
               {props.s.name}
             </span>
           }
@@ -166,6 +172,14 @@ function SampleRow(props: { s: SampleMeta; playing: boolean; onAudition: () => v
               {props.s.kind === 'print' ? 'print' : 'take'}
             </span>
           </Show>
+          <Show when={props.s.grid}>
+            <span class="pool-kind grid" title={`Beat grid: ${props.s.grid!.bpm.toFixed(2)} bpm. New clips from this sample follow the project tempo.`}>
+              {Math.round(props.s.grid!.bpm)} bpm
+            </span>
+          </Show>
+          <button type="button" class="text-btn" onClick={() => openSample(props.s.id)} title="Zoom in, find beats and chords, and cut pieces out">
+            Edit
+          </button>
           <button type="button" class="text-btn" onClick={() => instrumentFromSample(props.s.id)} title="Make a tracker instrument from this sample">
             Instrument
           </button>

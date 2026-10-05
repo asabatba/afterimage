@@ -2,7 +2,7 @@ import { Show, createEffect, createMemo, on } from 'solid-js';
 import { unwrap } from 'solid-js/store';
 import type { AudioClip, Clip, PatternClip } from '../model/types';
 import { clipEnd, effectivePitch, snapBeat, clipRate } from '../model/timing';
-import { trimStart, trimEnd, stretchTo, slip, setFades, effectiveFades } from '../model/clips';
+import { trimStart, trimEnd, stretchTo, slip, setFades, effectiveFades, fillClips, groupSpan, repeatClips } from '../model/clips';
 import { patternLengthBeats } from '../model/tracker';
 import { newId } from '../model/project';
 import { beginGesture, endGesture, isSelected, live, project, samples, samplesVersion, selectClips, setUi, ui } from '../store/app';
@@ -13,7 +13,7 @@ export interface ViewWindow {
   viewW: () => number;
 }
 
-type Mode = 'move' | 'copy' | 'slip' | 'trimL' | 'trimR' | 'stretch' | 'fadeIn' | 'fadeOut';
+type Mode = 'move' | 'copy' | 'slip' | 'trimL' | 'trimR' | 'stretch' | 'fadeIn' | 'fadeOut' | 'fill';
 
 const EDGE = 6;
 
@@ -79,11 +79,19 @@ export function ClipView(props: { clip: Clip; view: ViewWindow }) {
 
   const fades = () => (props.clip.kind === 'audio' ? effectiveFades(props.clip, project.clips) : { fadeIn: 0, fadeOut: 0 });
 
+  // The repeat handle sits on the selected clip that ends last, so dragging it extends the whole selection.
+  const rightmost = createMemo(() => {
+    if (!isSelected(props.clip.id)) return false;
+    const sel = project.clips.filter((c) => isSelected(c.id));
+    return sel.reduce((m, c) => (clipEnd(c) > clipEnd(m) ? c : m), sel[0])?.id === props.clip.id;
+  });
+
   const onPointerDown = (e: PointerEvent, zone?: Mode) => {
     if (e.button !== 0) return;
     e.stopPropagation();
     e.preventDefault();
     const id = props.clip.id;
+    setUi('activeTrackId', props.clip.trackId);
     const additive = e.ctrlKey || e.metaKey;
     if (additive) {
       selectClips([id], true);
@@ -108,7 +116,7 @@ export function ClipView(props: { clip: Clip; view: ViewWindow }) {
     const bpm = project.bpm;
     const primary = structuredClone(unwrap(props.clip)) as Clip;
     const group: Clip[] =
-      mode === 'move' || mode === 'copy'
+      mode === 'move' || mode === 'copy' || mode === 'fill'
         ? project.clips.filter((c) => isSelected(c.id)).map((c) => structuredClone(unwrap(c)) as Clip)
         : [primary];
     const trackIds = project.tracks.map((t) => t.id);
@@ -120,6 +128,9 @@ export function ClipView(props: { clip: Clip; view: ViewWindow }) {
     };
     let moved = false;
     let copies: Clip[] | null = null;
+    // Repeat handle: the copies currently in the project, kept across moves so only the changed tail is rebuilt.
+    let made: Clip[] = [];
+    const span = groupSpan(group);
     const snap = (b: number, ev: PointerEvent) => snapBeat(b, ui.grid, ui.snap && !ev.ctrlKey);
 
     const onMove = (ev: PointerEvent) => {
@@ -132,6 +143,25 @@ export function ClipView(props: { clip: Clip; view: ViewWindow }) {
         document.body.dataset.dragging = mode;
       }
       const dx = dxPx / ui.pxPerBeat;
+      if (mode === 'fill') {
+        // Whole copies as the pointer passes them; hold Shift to fill exactly to the pointer with a trimmed last copy.
+        const reach = snap(span.end + dx, ev);
+        const next = ev.shiftKey
+          ? fillClips(group, reach, bpm, sampleDur, undefined, true)
+          : repeatClips(group, Math.max(0, Math.floor((reach - span.end) / span.length + 0.5)));
+        const sig = (c: Clip) => `${c.trackId}:${c.start}:${c.length}`;
+        let keep = 0;
+        while (keep < made.length && keep < next.length && sig(made[keep]) === sig(next[keep])) keep++;
+        if (keep === made.length && keep === next.length) return;
+        const drop = new Set(made.slice(keep).map((c) => c.id));
+        const add = next.slice(keep);
+        made = [...made.slice(0, keep), ...add];
+        live((p) => {
+          if (drop.size) p.clips = p.clips.filter((c) => !drop.has(c.id));
+          p.clips.push(...structuredClone(add));
+        });
+        return;
+      }
       if (mode === 'move' || mode === 'copy') {
         const dRows = Math.round(dyPx / ui.trackHeight);
         const newStart = Math.max(0, snap(primary.start + dx, ev));
@@ -174,9 +204,12 @@ export function ClipView(props: { clip: Clip; view: ViewWindow }) {
       delete document.body.dataset.dragging;
       if (moved) {
         const labels: Record<Mode, string> = {
-          move: 'move', copy: 'copy', slip: 'slip', trimL: 'trim', trimR: 'trim', stretch: 'stretch', fadeIn: 'fade', fadeOut: 'fade',
+          move: 'move', copy: 'copy', slip: 'slip', trimL: 'trim', trimR: 'trim', stretch: 'stretch', fadeIn: 'fade', fadeOut: 'fade', fill: 'repeat',
         };
-        endGesture(labels[mode]);
+        if (mode === 'fill') {
+          if (made.length) selectClips(made.map((c) => c.id));
+          endGesture(labels[mode], made.length > 0);
+        } else endGesture(labels[mode]);
       } else if (wasSelected) {
         selectClips([props.clip.id]);
       }
@@ -225,6 +258,13 @@ export function ClipView(props: { clip: Clip; view: ViewWindow }) {
         ))}
       </div>
       <canvas ref={canvas} class="clip-canvas" />
+      <Show when={rightmost()}>
+        <span
+          class="fill-handle"
+          title="Drag right to repeat the selection (Shift: fill exactly to the pointer)"
+          onPointerDown={(e) => onPointerDown(e, 'fill')}
+        />
+      </Show>
       <Show when={props.clip.kind === 'audio'}>
         <svg class="clip-fades" width={width()} height={waveH()} style={{ top: '16px' }} aria-hidden="true">
           <Show when={fades().fadeIn > 0}>

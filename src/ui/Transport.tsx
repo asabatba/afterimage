@@ -3,6 +3,7 @@ import { BEATS_PER_BAR, beatsToSec, formatBBT, formatTime } from '../model/timin
 import { audio, canRedo, canUndo, playhead, playing, project, redo, setUi, ui, undo, undoLabel } from '../store/app';
 import { setBpm, setLoop, startCapture, stop, togglePlay } from '../store/actions';
 import { exportBundle, importBundle } from '../store/session';
+import { arrangementView } from './Arrangement';
 import { NumberField, Toggle } from './controls';
 import { captureStatus } from './captureState';
 
@@ -91,6 +92,18 @@ export function Transport() {
             <option value={g.v}>{g.label}</option>
           ))}
         </select>
+      </div>
+
+      <div class="tp-group" role="group" aria-label="Zoom">
+        <button type="button" class="ghost" onClick={() => setUi('pxPerBeat', Math.max(3, ui.pxPerBeat / 1.25))} title="Zoom out (−)" aria-label="Zoom out">
+          −
+        </button>
+        <button type="button" class="ghost" onClick={() => setUi('pxPerBeat', Math.min(400, ui.pxPerBeat * 1.25))} title="Zoom in (+, or Ctrl+wheel)" aria-label="Zoom in">
+          +
+        </button>
+        <button type="button" class="ghost" onClick={() => arrangementView.fit()} title="Fit the whole song in view. Z zooms to the selected clips.">
+          Fit
+        </button>
       </div>
 
       <div class="tp-group">

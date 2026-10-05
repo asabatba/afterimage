@@ -3,6 +3,8 @@ import type { AudioClip, PatternClip } from '../model/types';
 import { project, setUi, ui } from '../store/app';
 import { deleteSelected, duplicateSelected } from '../store/actions';
 import { ClipInspector } from './ClipInspector';
+import { ChopEditor } from './ChopEditor';
+import { ClipTools } from './ClipTools';
 import { TrackerEditor } from './TrackerEditor';
 import { SamplerEditor } from './SamplerEditor';
 import { Mixer } from './Mixer';
@@ -33,6 +35,7 @@ export function BottomPanel() {
           Mixer
         </button>
         <span class="tp-spacer" />
+        <ClipTools />
         <button type="button" class="ghost small" onClick={() => setUi('bottomOpen', !ui.bottomOpen)} aria-expanded={ui.bottomOpen}>
           {ui.bottomOpen ? 'Collapse' : 'Expand'}
         </button>
@@ -58,6 +61,7 @@ function DetailTitle() {
   const t = createMemo(() => {
     const s = ui.selection;
     if (s.kind === 'instrument') return 'Sampler';
+    if (s.kind === 'sample') return 'Sample';
     const c = selected();
     if (c?.kind === 'audio') return 'Clip';
     if (c?.kind === 'pattern') return 'Tracker';
@@ -70,6 +74,9 @@ function Detail() {
   const instrument = () => (ui.selection.kind === 'instrument' ? project.instruments.find((i) => i.id === (ui.selection as any).id) : undefined);
   return (
     <Switch fallback={<Empty />}>
+      <Match when={ui.selection.kind === 'sample' && project.samples.some((s) => s.id === (ui.selection as { id: string }).id) && (ui.selection as { id: string }).id} keyed>
+        {(id) => <ChopEditor sampleId={id} />}
+      </Match>
       <Match when={instrument()} keyed>
         {(ins) => <SamplerEditor instrument={project.instruments.find((i) => i.id === ins.id)!} />}
       </Match>
@@ -101,8 +108,9 @@ function Empty() {
     <div class="detail-empty">
       <p class="detail-empty-title">Select a clip to shape it.</p>
       <p>
-        Audio clips open their waveform, pitch and timing here; pattern clips open the tracker; instruments open the sampler. Space plays from the cursor, S splits at the
-        playhead, Ctrl+D duplicates, Alt-drag copies, Shift-drag slips content, Alt-drag a right edge to stretch.
+        Audio clips open their waveform, pitch and timing here; pattern clips open the tracker; instruments open the sampler; pool samples open the sample editor, where you
+        can zoom into a song, find its beats and chords, and cut pieces out. Space plays from the cursor, S splits at the playhead, Ctrl+C / X / V copy, cut and paste at the
+        cursor, Ctrl+D duplicates, Alt-drag copies, drag a selected clip’s corner handle to repeat it, Shift-drag slips content, Alt-drag a right edge to stretch.
       </p>
     </div>
   );

@@ -17,6 +17,7 @@ import {
   addClipFromSample,
   addMarker,
   addPatternClip,
+  addRegionClip,
   addTrack,
   importFiles,
   removeMarker,
@@ -28,11 +29,20 @@ import {
 } from '../store/actions';
 import { ClipView } from './ClipView';
 import { TRACK_COLORS } from './draw';
+import { SAMPLE_MIME, SLICE_MIME, type SliceDrag } from './dnd';
 import { meters } from './meters';
 
-export const SAMPLE_MIME = 'application/x-afterimage-sample';
+export { SAMPLE_MIME };
 
 const COLORS: Track['color'][] = ['amber', 'blue', 'sage', 'rust', 'ivory'];
+
+/** Zoom controls for the arrangement, usable from keys and the transport bar. */
+export const arrangementView = {
+  /** Fit a beat range into the visible width. */
+  zoomTo: (_from: number, _to: number) => {},
+  /** Fit the whole song (at least 4 bars). */
+  fit: () => {},
+};
 
 export function Arrangement() {
   let scroller!: HTMLDivElement;
@@ -49,6 +59,14 @@ export function Arrangement() {
     const ro = new ResizeObserver(() => setViewW(scroller.clientWidth - headerW));
     ro.observe(scroller);
     onCleanup(() => ro.disconnect());
+    arrangementView.zoomTo = (from, to) => {
+      const span = Math.max(to - from, BEATS_PER_BAR);
+      const pad = span * 0.04;
+      const ppb = Math.min(400, Math.max(3, (scroller.clientWidth - headerW) / (span + 2 * pad)));
+      setUi('pxPerBeat', ppb);
+      scroller.scrollLeft = Math.max(0, (from - pad) * ppb);
+    };
+    arrangementView.fit = () => arrangementView.zoomTo(0, Math.max(songEnd(project.clips), 4 * BEATS_PER_BAR));
   });
 
   // Keep the playhead in view while playing.
@@ -77,9 +95,10 @@ export function Arrangement() {
 
   // ── Lanes ──────────────────────────────────────────────────────────────
 
-  const onLaneDown = (e: PointerEvent) => {
+  const onLaneDown = (e: PointerEvent, trackId: string) => {
     if (e.button !== 0) return;
     if (!(e.ctrlKey || e.metaKey)) selectClips([]);
+    setUi('activeTrackId', trackId);
     seek(snapBeat(beatAtClientX(e.clientX), ui.grid, ui.snap));
   };
 
@@ -91,7 +110,7 @@ export function Arrangement() {
 
   const onDragOver = (e: DragEvent, trackId: string) => {
     const types = e.dataTransfer?.types ?? [];
-    if (!types.includes(SAMPLE_MIME) && !types.includes('Files')) return;
+    if (!types.includes(SAMPLE_MIME) && !types.includes(SLICE_MIME) && !types.includes('Files')) return;
     e.preventDefault();
     e.dataTransfer!.dropEffect = 'copy';
     setDropBeat({ trackId, beat: snapBeat(beatAtClientX(e.clientX), ui.grid, ui.snap) });
@@ -103,8 +122,16 @@ export function Arrangement() {
     const beat = snapBeat(beatAtClientX(e.clientX), ui.grid, ui.snap);
     setDropBeat(null);
     const id = e.dataTransfer?.getData(SAMPLE_MIME);
+    const slice = e.dataTransfer?.getData(SLICE_MIME);
     if (id) addClipFromSample(id, trackId, beat);
-    else if (e.dataTransfer?.files.length) void importFiles([...e.dataTransfer.files], { trackId, beat });
+    else if (slice) {
+      try {
+        const s = JSON.parse(slice) as SliceDrag;
+        addRegionClip(s.sampleId, s.from, s.to, trackId, beat);
+      } catch {
+        /* malformed payload from elsewhere: ignore */
+      }
+    } else if (e.dataTransfer?.files.length) void importFiles([...e.dataTransfer.files], { trackId, beat });
   };
 
   // ── Ruler: scrub, loop band, sections ─────────────────────────────────
@@ -320,7 +347,7 @@ export function Arrangement() {
                 <div
                   class="lane"
                   style={{ width: `${timelineW()}px` }}
-                  onPointerDown={onLaneDown}
+                  onPointerDown={(e) => onLaneDown(e, track.id)}
                   onDblClick={(e) => onLaneDbl(e, track.id)}
                   onDragOver={(e) => onDragOver(e, track.id)}
                   onDrop={(e) => onDrop(e, track.id)}
@@ -363,7 +390,7 @@ function TrackHeader(props: { track: Track }) {
   const armed = () => ui.capture.destTrackId === t().id;
   const level = () => meters().tracks[t().id] ?? 0;
   return (
-    <div class="track-head" style={{ '--track-color': TRACK_COLORS[t().color].line }}>
+    <div class="track-head" classList={{ active: ui.activeTrackId === t().id }} style={{ '--track-color': TRACK_COLORS[t().color].line }}>
       <button
         type="button"
         class="track-chip"

@@ -136,6 +136,66 @@ export function duplicateClip<C extends Clip>(c: C, start = clipEnd(c), trackId 
   return { ...c, id: newId('c'), start, trackId };
 }
 
+/** Arrangement span of a group of clips. */
+export function groupSpan(clips: Clip[]): { start: Beats; end: Beats; length: Beats } {
+  if (!clips.length) return { start: 0, end: 0, length: 0 };
+  const start = Math.min(...clips.map((c) => c.start));
+  const end = Math.max(...clips.map(clipEnd));
+  return { start, end, length: end - start };
+}
+
+export const MAX_COPIES = 512;
+
+/** `count` further copies of a group, each `step` beats after the last (default: the group's own length). */
+export function repeatClips(group: Clip[], count: number, step?: Beats): Clip[] {
+  const s = step ?? groupSpan(group).length;
+  if (!group.length || !(s > EPS)) return [];
+  const out: Clip[] = [];
+  for (let k = 1; k <= Math.min(MAX_COPIES, Math.floor(count)); k++) for (const c of group) out.push(duplicateClip(c, c.start + k * s));
+  return out;
+}
+
+/**
+ * Repeat a group until `target` (a beat). Copies starting at or past the target are dropped; with
+ * `trimLast` the copy that crosses it is shortened to end exactly there, otherwise it is dropped.
+ */
+export function fillClips(
+  group: Clip[],
+  target: Beats,
+  bpm: number,
+  sampleDuration: (c: Clip) => number = () => Infinity,
+  step?: Beats,
+  trimLast = true,
+): Clip[] {
+  const { start: s0, end: e0, length } = groupSpan(group);
+  const s = step ?? length;
+  if (!group.length || !(s > EPS) || target <= e0 + EPS) return [];
+  const out: Clip[] = [];
+  for (let k = 1; k <= MAX_COPIES && s0 + k * s < target - EPS; k++) {
+    for (const c of group) {
+      const start = c.start + k * s;
+      if (start >= target - EPS) continue;
+      let copy = duplicateClip(c, start);
+      if (clipEnd(copy) > target + EPS) {
+        if (!trimLast || target - start < MIN_CLIP_BEATS * 4) continue;
+        copy = trimEnd(copy, target, bpm, sampleDuration(c));
+      }
+      out.push(copy);
+    }
+  }
+  return out;
+}
+
+/** Copies of `clips` moved so the earliest starts at `at`, with track rows shifted by `rowShift` (clamped). */
+export function pasteClips(clips: Clip[], at: Beats, trackIds: string[], rowShift = 0): Clip[] {
+  if (!clips.length || !trackIds.length) return [];
+  const first = Math.min(...clips.map((c) => c.start));
+  return clips.map((c) => {
+    const row = Math.min(trackIds.length - 1, Math.max(0, Math.max(0, trackIds.indexOf(c.trackId)) + rowShift));
+    return duplicateClip(c, Math.max(0, at + (c.start - first)), trackIds[row]);
+  });
+}
+
 export function setFades(c: AudioClip, fadeIn: Beats, fadeOut: Beats): AudioClip {
   fadeIn = Math.max(0, Math.min(c.length, fadeIn));
   fadeOut = Math.max(0, Math.min(c.length - fadeIn, fadeOut));

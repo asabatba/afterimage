@@ -1,10 +1,24 @@
 import { Show, createEffect, on, onCleanup, onMount } from 'solid-js';
-import { audio, canRedo, canUndo, playing, project, rawProject, redo, selectClips, setPlayhead, setUi, toast, ui, undo } from './store/app';
-import { addMarker, deleteSelected, duplicateSelected, seek, setLoop, splitAt, startCapture, stop, togglePlay } from './store/actions';
+import { audio, canRedo, canUndo, playing, project, rawProject, redo, selectClips, selectedClipIds, setPlayhead, setUi, toast, ui, undo } from './store/app';
+import {
+  addMarker,
+  copySelected,
+  cutSelected,
+  deleteSelected,
+  duplicateSelected,
+  pasteClipboard,
+  seek,
+  setLoop,
+  splitAt,
+  startCapture,
+  stop,
+  togglePlay,
+} from './store/actions';
+import { groupSpan } from './model/clips';
 import { installAutosave, startSession } from './store/session';
 import { Transport } from './ui/Transport';
 import { Pool } from './ui/Pool';
-import { Arrangement } from './ui/Arrangement';
+import { Arrangement, arrangementView } from './ui/Arrangement';
 import { BottomPanel } from './ui/Detail';
 import { CapturePanel } from './ui/CapturePanel';
 import { Dialogs } from './ui/Dialogs';
@@ -85,6 +99,16 @@ export function App() {
       duplicateSelected();
       return;
     }
+    if (mod && (k === 'c' || k === 'x' || k === 'v')) {
+      // The tracker has its own clipboard for cells, and text selections copy as usual.
+      if ((e.target as HTMLElement | null)?.closest?.('.tracker')) return;
+      if (k !== 'v' && window.getSelection()?.toString()) return;
+      e.preventDefault();
+      if (k === 'c') copySelected();
+      else if (k === 'x') cutSelected();
+      else pasteClipboard();
+      return;
+    }
     if (mod && k === 'e') {
       e.preventDefault();
       splitAt(playing() ? playhead() : ui.cursor);
@@ -122,6 +146,15 @@ export function App() {
       case 'home':
         seek(0);
         break;
+      case 'z': {
+        // Zoom to the selected clips, or fit the whole song.
+        const sel = project.clips.filter((c) => selectedClipIds().includes(c.id));
+        if (sel.length) {
+          const s = groupSpan(sel);
+          arrangementView.zoomTo(s.start, s.end);
+        } else arrangementView.fit();
+        break;
+      }
       case 'escape':
         selectClips([]);
         break;

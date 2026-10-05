@@ -22,10 +22,18 @@ export const rawProject = () => unwrap(project);
 export type Selection =
   | { kind: 'none' }
   | { kind: 'clips'; ids: string[] }
-  | { kind: 'instrument'; id: string };
+  | { kind: 'instrument'; id: string }
+  | { kind: 'sample'; id: string };
+
+export type RepeatStep = 'auto' | 'bar' | 'bars2' | 'bars4';
+export type FillTarget = 'loop' | 'section' | 'song' | 'bars8' | 'bars16' | 'bars32';
 
 export interface UiState {
   selection: Selection;
+  /** Track that paste and slices land on by default (the last lane or clip clicked). */
+  activeTrackId: string | null;
+  /** Repeat and fill settings for the selected clips. */
+  tools: { repeatCount: number; step: RepeatStep; fillTo: FillTarget };
   snap: boolean;
   grid: number; // beats
   pxPerBeat: number;
@@ -66,6 +74,8 @@ export interface UiState {
 
 export const [ui, setUi] = createStore<UiState>({
   selection: { kind: 'none' },
+  activeTrackId: null,
+  tools: { repeatCount: 4, step: 'auto', fillTo: 'loop' },
   snap: true,
   grid: 0.25,
   pxPerBeat: 28,
@@ -245,6 +255,8 @@ function pruneSelection() {
     const ids = s.ids.filter((id) => project.clips.some((c) => c.id === id));
     setUi('selection', ids.length ? { kind: 'clips', ids } : { kind: 'none' });
   } else if (s.kind === 'instrument' && !project.instruments.some((i) => i.id === s.id)) {
+    setUi('selection', { kind: 'none' });
+  } else if (s.kind === 'sample' && !project.samples.some((x) => x.id === s.id)) {
     setUi('selection', { kind: 'none' });
   }
 }

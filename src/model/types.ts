@@ -27,6 +27,12 @@ export interface SampleSourceRef {
   sampleIds?: Id[];
 }
 
+/** A tempo grid on a sample's own timeline. `offset` is the time of a downbeat. */
+export interface BeatGrid {
+  bpm: number;
+  offset: Seconds;
+}
+
 export interface SampleMeta {
   id: Id;
   name: string;
@@ -45,6 +51,8 @@ export interface SampleMeta {
   beats?: number;
   /** Tempo the sample was captured at (tempo-bound captures). */
   bpm?: number;
+  /** Detected or hand-set beat grid; new clips from this sample follow tempo using it. */
+  grid?: BeatGrid;
 }
 
 export type TimingMode = 'free' | 'tempo';
