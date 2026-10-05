@@ -4,9 +4,9 @@
 //   master → master.out: whole mix incl. shared effects; metronome/audition excluded
 import { beatsToSec, secToBeats } from '../model/timing';
 import type { AudioEngine } from './engine';
-import workletSource from './worklets/recorder.worklet.js?raw';
 import CaptureWorker from './worklets/capture.worker.ts?worker&inline';
 import { attachCollector } from './worklets/collector';
+import workletSource from './worklets/recorder.worklet.js?raw';
 
 /** Start the capture worker and confirm it answers; null if workers can't run here. */
 function startWorker(): Promise<Worker | null> {
@@ -67,7 +67,10 @@ export interface InputInfo {
 }
 
 export class CaptureError extends Error {
-  constructor(message: string, readonly kind: 'cancelled' | 'interrupted' | 'overrun' | 'permission' | 'device') {
+  constructor(
+    message: string,
+    readonly kind: 'cancelled' | 'interrupted' | 'overrun' | 'permission' | 'device',
+  ) {
     super(message);
   }
 }
@@ -190,7 +193,8 @@ export class CaptureManager {
     }
     const track = stream.getAudioTracks()[0];
     track.addEventListener('ended', () => {
-      if (this.pending && this.pending.opts.source.kind === 'input') this.fail(new CaptureError('The input device disconnected — the take was discarded.', 'interrupted'));
+      if (this.pending && this.pending.opts.source.kind === 'input')
+        this.fail(new CaptureError('The input device disconnected — the take was discarded.', 'interrupted'));
       this.disableInput();
     });
     this.stream = stream;
@@ -240,7 +244,7 @@ export class CaptureManager {
         ? this.inputGain
         : source.kind === 'master'
           ? this.engine.graph.masterOut
-          : this.engine.graph.strip(source.trackId)?.post ?? null;
+          : (this.engine.graph.strip(source.trackId)?.post ?? null);
     if (!node) throw new CaptureError('That track no longer exists.', 'device');
     node.connect(this.tap);
     this.connected = node;

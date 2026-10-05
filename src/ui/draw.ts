@@ -1,8 +1,9 @@
 // Canvas drawing for waveforms and pattern previews (from cached peaks).
-import type { AudioClip, Pattern, PatternClip, Track } from '../model/types';
-import { peakSpan, type Peaks } from '../model/peaks';
-import { EPS, clipRate, contentLengthBeats, beatsToSec, mod } from '../model/timing';
+
+import { type Peaks, peakSpan } from '../model/peaks';
+import { beatsToSec, clipRate, contentLengthBeats, EPS, mod } from '../model/timing';
 import { patternEvents, patternLengthBeats } from '../model/tracker';
+import type { AudioClip, Pattern, PatternClip, Track } from '../model/types';
 import { NOTE_OFF } from '../model/types';
 
 export const TRACK_COLORS: Record<Track['color'], { line: string; fill: string; wave: string; ink: string }> = {
@@ -97,8 +98,13 @@ export function drawPatternPreview(
   const events = patternEvents(pattern).filter((e) => e.kind === 'note');
   const L = patternLengthBeats(pattern);
   if (!events.length || L <= 0) return;
-  let lo = 127, hi = 0;
-  for (const e of events) if (e.kind === 'note' && e.note !== NOTE_OFF) { lo = Math.min(lo, e.note); hi = Math.max(hi, e.note); }
+  let lo = 127,
+    hi = 0;
+  for (const e of events)
+    if (e.kind === 'note' && e.note !== NOTE_OFF) {
+      lo = Math.min(lo, e.note);
+      hi = Math.max(hi, e.note);
+    }
   const range = Math.max(12, hi - lo + 1);
   const pad = 3;
   const rowH = Math.max(2, Math.min(5, (h - 2 * pad) / range));

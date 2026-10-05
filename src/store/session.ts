@@ -1,13 +1,13 @@
 // Project lifecycle: startup recovery, autosave, new/open/delete, bundles.
 import { createEffect, on } from 'solid-js';
 import { reconcile, unwrap } from 'solid-js/store';
-import type { Project } from '../model/types';
-import { createProject, migrateProject } from '../model/project';
 import { bufferFromChannels, channelsOf } from '../audio/samples';
+import { createProject, migrateProject } from '../model/project';
+import type { Project } from '../model/types';
+import { download } from './actions';
+import { audio, project, resetHistory, samples, setPlayhead, setProject, setUi, toast, ui } from './app';
 import { BUNDLE_EXT, createBundle, readBundle } from './bundle';
 import * as db from './db';
-import { audio, project, resetHistory, samples, setPlayhead, setProject, setUi, toast, ui } from './app';
-import { download } from './actions';
 
 const SESSION_KEY = 'session';
 interface SessionInfo {
@@ -23,7 +23,14 @@ async function loadIntoApp(p: Project) {
     audio().engine.stop();
     samples.clear();
     const rows = await db.loadSamples(p.id);
-    for (const r of rows) samples.add(r.id, bufferFromChannels(r.channels.map((b) => new Float32Array(b)), r.sampleRate));
+    for (const r of rows)
+      samples.add(
+        r.id,
+        bufferFromChannels(
+          r.channels.map((b) => new Float32Array(b)),
+          r.sampleRate,
+        ),
+      );
     const missing = p.samples.filter((s) => !samples.has(s.id));
     setProject(reconcile(p));
     resetHistory();
@@ -34,7 +41,12 @@ async function loadIntoApp(p: Project) {
       capture: { ...ui.capture, destTrackId: p.tracks[0]?.id ?? null },
     });
     setPlayhead(0);
-    if (missing.length) toast(`${missing.length} sample${missing.length > 1 ? 's are' : ' is'} missing audio in browser storage: ${missing.map((m) => m.name).join(', ')}.`, 'error', 0);
+    if (missing.length)
+      toast(
+        `${missing.length} sample${missing.length > 1 ? 's are' : ' is'} missing audio in browser storage: ${missing.map((m) => m.name).join(', ')}.`,
+        'error',
+        0,
+      );
     await db.setKv(SESSION_KEY, { projectId: p.id, clean: false } satisfies SessionInfo);
   } finally {
     loading = false;

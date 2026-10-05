@@ -1,8 +1,8 @@
 // Copy / paste / repeat / fill for the selected clips, in the bottom panel's tab bar.
 import { Show } from 'solid-js';
+import { clipboardCount, copySelected, cutSelected, duplicateSelected, fillSelected, loopToSelection, pasteClipboard, repeatSelected } from '../store/actions';
 import type { FillTarget, RepeatStep } from '../store/app';
 import { selectedClipIds, setUi, ui } from '../store/app';
-import { clipboardCount, copySelected, cutSelected, duplicateSelected, fillSelected, loopToSelection, pasteClipboard, repeatSelected } from '../store/actions';
 
 const STEPS: { value: RepeatStep; label: string }[] = [
   { value: 'auto', label: 'clip length' },
@@ -68,7 +68,13 @@ export function ClipTools() {
           </select>
         </span>
         <span class="tool-group">
-          <button type="button" class="ghost small" disabled={!n()} onClick={() => fillSelected()} title="Repeat the selection until the target; the last copy is trimmed to fit">
+          <button
+            type="button"
+            class="ghost small"
+            disabled={!n()}
+            onClick={() => fillSelected()}
+            title="Repeat the selection until the target; the last copy is trimmed to fit"
+          >
             Fill to
           </button>
           <select aria-label="Fill target" value={ui.tools.fillTo} onChange={(e) => setUi('tools', 'fillTo', e.currentTarget.value as FillTarget)}>

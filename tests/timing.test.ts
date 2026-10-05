@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { createAudioClip } from '../src/model/project';
-import { sample } from './helpers';
 import {
   clipRate,
   contentLengthBeats,
@@ -13,6 +12,7 @@ import {
   snapBeat,
   sourcePosAt,
 } from '../src/model/timing';
+import { sample } from './helpers';
 
 describe('clip timing', () => {
   it('a 4 s phrase at 120 bpm spans 8 beats', () => {

@@ -1,6 +1,6 @@
-import { test, expect, type Page } from '@playwright/test';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { expect, type Page, test } from '@playwright/test';
 
 const FIX = fileURLToPath(new URL('./fixtures/', import.meta.url));
 const fixture = (f: string) => path.join(FIX, f);
@@ -14,9 +14,13 @@ const BARS = 8;
 function makeSong(): Buffer {
   const beat = 60 / BPM;
   const n = Math.floor((OFFSET + BARS * 4 * beat + 1) * SR);
-  const L = new Float32Array(n), R = new Float32Array(n);
+  const L = new Float32Array(n),
+    R = new Float32Array(n);
   let seed = 12345;
-  const rnd = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296) * 2 - 1;
+  const rnd = () => {
+    seed = (seed * 1664525 + 1013904223) >>> 0;
+    return (seed / 4294967296) * 2 - 1;
+  };
   const add = (t: number, len: number, fn: (s: number) => number, pan = 0) => {
     const s0 = Math.floor(t * SR);
     for (let i = 0; i < len * SR && s0 + i < n; i++) {
@@ -26,14 +30,24 @@ function makeSong(): Buffer {
     }
   };
   const hz = (m: number) => 440 * 2 ** ((m - 69) / 12);
-  const chords = [[60, 64, 67], [53, 57, 60], [57, 60, 64], [55, 59, 62]];
+  const chords = [
+    [60, 64, 67],
+    [53, 57, 60],
+    [57, 60, 64],
+    [55, 59, 62],
+  ];
   const roots = [36, 41, 33, 31];
   for (let bar = 0; bar < BARS; bar++) {
     const t0 = OFFSET + bar * 4 * beat;
     const ci = Math.floor(bar / 2) % 4;
     for (const m of chords[ci]) {
       const f = hz(m);
-      add(t0, 4 * beat, (s) => 0.07 * (Math.sin(2 * Math.PI * f * s) + 0.5 * Math.sin(4 * Math.PI * f * s)) * Math.min(1, s * 40) * Math.min(1, (4 * beat - s) * 20), m % 2 ? 0.3 : -0.3);
+      add(
+        t0,
+        4 * beat,
+        (s) => 0.07 * (Math.sin(2 * Math.PI * f * s) + 0.5 * Math.sin(4 * Math.PI * f * s)) * Math.min(1, s * 40) * Math.min(1, (4 * beat - s) * 20),
+        m % 2 ? 0.3 : -0.3,
+      );
     }
     for (let b = 0; b < 4; b++) {
       const t = t0 + b * beat;
@@ -222,7 +236,6 @@ test('dragging selects a range that snaps to the beat grid, and its edges can be
   await page.keyboard.up('Alt');
   const [a3, b3] = (await range())!;
 
-
   expect(onGrid(a3) && onGrid(b3)).toBe(false);
 });
 
@@ -242,7 +255,7 @@ test('Shift+Enter places the selection and steps to the next bar; a chord can be
   await expect(page.locator('.chop')).toBeVisible();
 
   await page.locator('.chop-chords .chord').nth(1).click();
-  await expect(page.locator('.insp-readout').first()).toContainText('4.00 beats'.slice(0, 0) + 'Selection');
+  await expect(page.locator('.insp-readout').first()).toContainText('Selection');
   await expect(page.locator('.chop-side .chip').last()).toContainText('F');
 });
 
@@ -285,8 +298,14 @@ test('a pitched sample becomes a tuned instrument; clips report note and chord',
   expect(Math.abs(ins.fineTune)).toBeLessThanOrEqual(30);
 
   // Place the sample and ask the clip inspector what it hears.
-  await page.locator('.pool-item.sample').first().dragTo(page.locator('.lane').nth(0), { targetPosition: { x: 4, y: 30 } });
-  await page.locator('.clip').first().click({ position: { x: 20, y: 30 } });
+  await page
+    .locator('.pool-item.sample')
+    .first()
+    .dragTo(page.locator('.lane').nth(0), { targetPosition: { x: 4, y: 30 } });
+  await page
+    .locator('.clip')
+    .first()
+    .click({ position: { x: 20, y: 30 } });
   await page.getByRole('button', { name: 'Note & chord' }).click();
   await expect(page.locator('.insp-controls .chip').first()).toContainText('C-4');
 });
@@ -295,7 +314,10 @@ test.describe('arrangement: copy, paste, repeat and fill', () => {
   async function placeLoop(page: Page) {
     await page.setInputFiles('.pool input[type=file]', fixture('drum-loop.wav'));
     await expect(page.locator('.pool-item.sample')).toHaveCount(1);
-    await page.locator('.pool-item.sample').first().dragTo(page.locator('.lane').nth(0), { targetPosition: { x: 2, y: 30 } });
+    await page
+      .locator('.pool-item.sample')
+      .first()
+      .dragTo(page.locator('.lane').nth(0), { targetPosition: { x: 2, y: 30 } });
     await expect(page.locator('.clip')).toHaveCount(1);
     return (await audioClips(page))[0];
   }
@@ -329,7 +351,10 @@ test.describe('arrangement: copy, paste, repeat and fill', () => {
   test('copy and paste continue where the last paste ended, on the clicked track', async ({ page }) => {
     await freshApp(page);
     const c = await placeLoop(page);
-    await page.locator('.clip').first().click({ position: { x: 20, y: 30 } });
+    await page
+      .locator('.clip')
+      .first()
+      .click({ position: { x: 20, y: 30 } });
     await page.keyboard.press('Control+c');
     // Click an empty stretch of track 2, past the clip, to set the cursor and the active track.
     const lane = page.locator('.lane').nth(1);
@@ -345,7 +370,10 @@ test.describe('arrangement: copy, paste, repeat and fill', () => {
     expect(pasted[0].start).toBeCloseTo(20, 0);
     expect(pasted[1].start).toBeCloseTo(pasted[0].start + c.length, 5);
     // Cut removes and pastes elsewhere.
-    await page.locator('.clip').first().click({ position: { x: 20, y: 30 } });
+    await page
+      .locator('.clip')
+      .first()
+      .click({ position: { x: 20, y: 30 } });
     await page.keyboard.press('Control+x');
     expect((await audioClips(page)).length).toBe(2);
   });
@@ -360,7 +388,10 @@ test.describe('arrangement: copy, paste, repeat and fill', () => {
     await page.getByRole('button', { name: 'Zoom out' }).first().click();
     expect((await uiState(page)).pxPerBeat).toBeLessThan(fitted);
     // Z with a clip selected zooms to it; with nothing selected it fits the song.
-    await page.locator('.clip').first().click({ position: { x: 20, y: 30 } });
+    await page
+      .locator('.clip')
+      .first()
+      .click({ position: { x: 20, y: 30 } });
     await page.keyboard.press('z');
     const toClip = (await uiState(page)).pxPerBeat;
     expect(toClip).toBeGreaterThan(before);
@@ -373,12 +404,16 @@ test.describe('arrangement: copy, paste, repeat and fill', () => {
   test('dragging the corner handle repeats the clip', async ({ page }) => {
     await freshApp(page);
     const c = await placeLoop(page);
-    await page.locator('.clip').first().click({ position: { x: 20, y: 30 } });
+    await page
+      .locator('.clip')
+      .first()
+      .click({ position: { x: 20, y: 30 } });
     const handle = page.locator('.fill-handle');
     await expect(handle).toBeVisible();
     const hb = (await handle.boundingBox())!;
     const ppb = (await uiState(page)).pxPerBeat;
-    const x0 = hb.x + hb.width / 2, y0 = hb.y + hb.height / 2;
+    const x0 = hb.x + hb.width / 2,
+      y0 = hb.y + hb.height / 2;
     await page.mouse.move(x0, y0);
     await page.mouse.down();
     await page.mouse.move(x0 + c.length * ppb * 2.6, y0, { steps: 8 });

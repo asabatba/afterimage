@@ -1,15 +1,16 @@
 // The audio engine: transport, look-ahead scheduler, clip playback and tracker
 // voices. The same class renders offline for export, so playback and export
 // share scheduling, DSP and effects.
-import type { AudioClip, Clip, Instrument, PatternClip, Project } from '../model/types';
-import { EPS, beatsToSec, clipEnd, dbToGain, secToBeats } from '../model/timing';
-import { planAudio, clipsToStart, type AudioPlan } from '../model/playback';
+
 import { effectiveFades } from '../model/clips';
-import { clipEventsInRange, patternEvents, type NoteEvent } from '../model/tracker';
-import { MixerGraph, analyserPeak } from './graph';
-import { StretchPool, type StretchNode } from './stretchPool';
-import { startVoice, type Voice } from './voices';
+import { type AudioPlan, clipsToStart, planAudio } from '../model/playback';
+import { beatsToSec, clipEnd, dbToGain, EPS, secToBeats } from '../model/timing';
+import { clipEventsInRange, type NoteEvent, patternEvents } from '../model/tracker';
+import type { AudioClip, Clip, Instrument, PatternClip, Project } from '../model/types';
+import { analyserPeak, MixerGraph } from './graph';
 import type { SampleRegistry } from './samples';
+import { type StretchNode, StretchPool } from './stretchPool';
+import { startVoice, type Voice } from './voices';
 
 export interface EngineHost {
   project(): Project;
@@ -98,7 +99,10 @@ export class AudioEngine {
   private auditionInfo: { id: string; t0: number; from: number; to: number; loop: boolean } | null = null;
   private listeners = new Set<(playing: boolean) => void>();
 
-  constructor(readonly ctx: BaseAudioContext, readonly host: EngineHost) {
+  constructor(
+    readonly ctx: BaseAudioContext,
+    readonly host: EngineHost,
+  ) {
     this.realtime = typeof AudioContext !== 'undefined' && ctx instanceof AudioContext;
     this.graph = new MixerGraph(ctx, this.realtime);
     this.pool = new StretchPool(ctx);
@@ -460,7 +464,7 @@ export class AudioEngine {
     for (const o of this.occs) {
       if (o.stopped || o.t1 <= t) continue;
       const c = byId.get(o.clipId);
-      if (!c || c.kind !== 'audio') {
+      if (c?.kind !== 'audio') {
         this.stopOcc(o, now + 0.005);
         continue;
       }
@@ -579,11 +583,7 @@ export class AudioEngine {
     if (!s) return () => {};
     if (this.realtime && this.ctx.state === 'suspended') void (this.ctx as AudioContext).resume();
     const t = this.ctx.currentTime + 0.005;
-    const v = startVoice(
-      this.ctx,
-      { out: this.graph.cue },
-      { instrument: ins, buffer: s.buffer, note, vel, start: t, end: t + 30 },
-    );
+    const v = startVoice(this.ctx, { out: this.graph.cue }, { instrument: ins, buffer: s.buffer, note, vel, start: t, end: t + 30 });
     return () => v.release(this.ctx.currentTime);
   }
 
@@ -644,8 +644,12 @@ function maxConcurrent(clips: Clip[]) {
   const pts: [number, number][] = [];
   for (const c of clips) pts.push([c.start, 1], [clipEnd(c), -1]);
   pts.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
-  let n = 0, m = 0;
-  for (const [, d] of pts) m = Math.max(m, (n += d));
+  let n = 0,
+    m = 0;
+  for (const [, d] of pts) {
+    n += d;
+    m = Math.max(m, n);
+  }
   return m;
 }
 

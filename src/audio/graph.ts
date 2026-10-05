@@ -7,9 +7,10 @@
 //   master.in + fx returns ─► master.volume ─► master.out (master capture, meter) ─► destination
 //   metronome / audition ─► cue ─► destination
 //   input ─► inputGain ─► monitor (off by default) ─► destination
-import type { FxSettings, Project, Track } from '../model/types';
+
 import { audibleTracks } from '../model/playback';
 import { beatsToSec, dbToGain } from '../model/timing';
+import type { FxSettings, Project, Track } from '../model/types';
 
 const SMOOTH = 0.015;
 
@@ -56,14 +57,18 @@ export class MixerGraph {
   private reverbKey = '';
   private first = true;
 
-  constructor(readonly ctx: BaseAudioContext, readonly metering: boolean) {
+  constructor(
+    readonly ctx: BaseAudioContext,
+    readonly metering: boolean,
+  ) {
     this.masterIn = ctx.createGain();
     this.masterVolume = ctx.createGain();
     this.masterOut = ctx.createGain();
     this.masterIn.connect(this.masterVolume).connect(this.masterOut).connect(ctx.destination);
     if (metering) {
       const split = ctx.createChannelSplitter(2);
-      const l = ctx.createAnalyser(), r = ctx.createAnalyser();
+      const l = ctx.createAnalyser(),
+        r = ctx.createAnalyser();
       l.fftSize = r.fftSize = 2048;
       this.masterOut.connect(split);
       split.connect(l, 0);
@@ -109,7 +114,7 @@ export class MixerGraph {
       reverbSend: ctx.createGain(),
     };
     s.lowpass.type = 'lowpass';
-    s.lowpass.Q.value = 0.707;
+    s.lowpass.Q.value = Math.SQRT1_2;
     s.input.connect(s.lowpass).connect(s.volume).connect(s.pan).connect(s.post).connect(s.mute);
     s.mute.connect(this.masterIn);
     s.mute.connect(s.delaySend).connect(this.delayIn);

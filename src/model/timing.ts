@@ -88,7 +88,7 @@ export function fadeGainAt(local: Beats, length: Beats, fadeIn: Beats, fadeOut: 
   return g;
 }
 
-export const dbToGain = (db: number) => (db <= -96 ? 0 : Math.pow(10, db / 20));
+export const dbToGain = (db: number) => (db <= -96 ? 0 : 10 ** (db / 20));
 export const gainToDb = (g: number) => (g <= 0 ? -Infinity : 20 * Math.log10(g));
 
 /** "bar.beat.sixteenth", 1-based. Negative beats are shown as count-in. */

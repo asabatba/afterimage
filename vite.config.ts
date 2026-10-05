@@ -1,6 +1,6 @@
 import { defineConfig } from 'vite';
-import solid from 'vite-plugin-solid';
 import { viteSingleFile } from 'vite-plugin-singlefile';
+import solid from 'vite-plugin-solid';
 
 // `npm run build` produces a normal multi-file build in dist/.
 // `npm run build:single` inlines everything into one HTML file (dist-single/),

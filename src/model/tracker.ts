@@ -1,8 +1,9 @@
 // Tracker pattern data and timing. Pure.
-import type { Beats, Cell, FxCode, Pattern, PatternClip } from './types';
-import { NOTE_OFF } from './types';
+
 import { newId } from './project';
 import { EPS, mod } from './timing';
+import type { Beats, Cell, FxCode, Pattern, PatternClip } from './types';
+import { NOTE_OFF } from './types';
 
 export const FX_CODES: FxCode[] = ['O', 'R', 'P', 'F', 'D', 'V'];
 export const FX_HELP: Record<FxCode, string> = {
@@ -37,9 +38,7 @@ export const patternLengthBeats = (p: Pattern): Beats => p.rows / p.rowsPerBeat;
 export function resizePattern(p: Pattern, rows: number, columns: number): Pattern {
   rows = Math.max(1, Math.min(256, Math.round(rows)));
   columns = Math.max(1, Math.min(16, Math.round(columns)));
-  const cells = Array.from({ length: rows }, (_, r) =>
-    Array.from({ length: columns }, (_, c) => p.cells[r]?.[c] ?? null),
-  );
+  const cells = Array.from({ length: rows }, (_, r) => Array.from({ length: columns }, (_, c) => p.cells[r]?.[c] ?? null));
   return { ...p, rows, columns, cells };
 }
 
@@ -65,10 +64,40 @@ export const hex2 = (v: number | undefined) => (v === undefined ? '··' : v.toS
 
 /** Two-row piano layout (FastTracker style). Returns semitone offset from the base octave's C. */
 const KEY_OFFSETS: Record<string, number> = {
-  KeyZ: 0, KeyS: 1, KeyX: 2, KeyD: 3, KeyC: 4, KeyV: 5, KeyG: 6, KeyB: 7, KeyH: 8, KeyN: 9, KeyJ: 10, KeyM: 11,
-  Comma: 12, KeyL: 13, Period: 14, Semicolon: 15, Slash: 16,
-  KeyQ: 12, Digit2: 13, KeyW: 14, Digit3: 15, KeyE: 16, KeyR: 17, Digit5: 18, KeyT: 19, Digit6: 20, KeyY: 21,
-  Digit7: 22, KeyU: 23, KeyI: 24, Digit9: 25, KeyO: 26, Digit0: 27, KeyP: 28,
+  KeyZ: 0,
+  KeyS: 1,
+  KeyX: 2,
+  KeyD: 3,
+  KeyC: 4,
+  KeyV: 5,
+  KeyG: 6,
+  KeyB: 7,
+  KeyH: 8,
+  KeyN: 9,
+  KeyJ: 10,
+  KeyM: 11,
+  Comma: 12,
+  KeyL: 13,
+  Period: 14,
+  Semicolon: 15,
+  Slash: 16,
+  KeyQ: 12,
+  Digit2: 13,
+  KeyW: 14,
+  Digit3: 15,
+  KeyE: 16,
+  KeyR: 17,
+  Digit5: 18,
+  KeyT: 19,
+  Digit6: 20,
+  KeyY: 21,
+  Digit7: 22,
+  KeyU: 23,
+  KeyI: 24,
+  Digit9: 25,
+  KeyO: 26,
+  Digit0: 27,
+  KeyP: 28,
 };
 
 export function keyToNote(code: string, octave: number): number | null {
@@ -132,7 +161,7 @@ export function patternEvents(p: Pattern): PatternEvent[] {
             instrumentId: cell.instrumentId ?? lastInstrument,
             vel: (cell.vel ?? MAX_VEL) / MAX_VEL,
             fx: cell.fx,
-            fxValue: cell.fx ? cell.fxValue ?? 0 : undefined,
+            fxValue: cell.fx ? (cell.fxValue ?? 0) : undefined,
           };
           out.push(pending);
         }
@@ -218,9 +247,7 @@ export function copyBlock(p: Pattern, b: Block): (Cell | null)[][] {
 
 export function mapBlock(p: Pattern, b: Block, fn: (cell: Cell | null, row: number, col: number) => Cell | null): Pattern {
   const n = normBlock(b);
-  const cells = p.cells.map((row, r) =>
-    row.map((cell, c) => (r >= n.row0 && r <= n.row1 && c >= n.col0 && c <= n.col1 ? fn(cell, r, c) : cell)),
-  );
+  const cells = p.cells.map((row, r) => row.map((cell, c) => (r >= n.row0 && r <= n.row1 && c >= n.col0 && c <= n.col1 ? fn(cell, r, c) : cell)));
   return { ...p, cells };
 }
 
@@ -230,7 +257,8 @@ export function pasteBlock(p: Pattern, row: number, col: number, data: (Cell | n
   const cells = p.cells.map((r) => r.slice());
   data.forEach((dr, i) =>
     dr.forEach((cell, j) => {
-      const r = row + i, c = col + j;
+      const r = row + i,
+        c = col + j;
       if (r < p.rows && c < p.columns) cells[r][c] = cell ? { ...cell } : null;
     }),
   );

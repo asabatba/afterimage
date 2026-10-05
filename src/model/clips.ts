@@ -1,20 +1,9 @@
 // Pure arrangement editing operations. Each returns new objects; the store
 // applies them and records undo history.
-import type { AudioClip, Beats, Clip, PatternClip } from './types';
-import {
-  EPS,
-  MIN_REGION,
-  beatsToSec,
-  clipEnd,
-  clipRate,
-  contentLengthBeats,
-  mod,
-  normalizeClip,
-  regionDuration,
-  secToBeats,
-  sourcePosAt,
-} from './timing';
+
 import { newId } from './project';
+import { beatsToSec, clipEnd, clipRate, contentLengthBeats, EPS, MIN_REGION, mod, normalizeClip, regionDuration, secToBeats, sourcePosAt } from './timing';
+import type { AudioClip, Beats, Clip, PatternClip } from './types';
 
 export const MIN_CLIP_BEATS = 1 / 64;
 
@@ -125,10 +114,7 @@ export function splitClip(c: Clip, at: Beats, bpm: number): [Clip, Clip] | null 
   }
   const cut = sourcePosAt(c, bpm, leftLen);
   const left = normalizeClip({ ...c, srcEnd: cut, fadeOut: 0, fadeIn: Math.min(c.fadeIn, leftLen) }, bpm);
-  const right = normalizeClip(
-    { ...c, id: newId('c'), start: at, srcStart: cut, fadeIn: 0, fadeOut: Math.min(c.fadeOut, rightLen) },
-    bpm,
-  );
+  const right = normalizeClip({ ...c, id: newId('c'), start: at, srcStart: cut, fadeIn: 0, fadeOut: Math.min(c.fadeOut, rightLen) }, bpm);
   return [left, right];
 }
 
@@ -227,14 +213,13 @@ export function checkOverlaps(clips: Clip[]): OverlapProblem | null {
     list.sort((a, b) => a.start - b.start || b.length - a.length);
     for (let i = 0; i < list.length; i++) {
       for (let j = i + 1; j < list.length; j++) {
-        const a = list[i], b = list[j];
+        const a = list[i],
+          b = list[j];
         if (b.start >= clipEnd(a) - EPS) break;
         if (clipEnd(b) <= clipEnd(a) + EPS) return { trackId, clipIds: [a.id, b.id], reason: 'contained' };
-        for (let k = j + 1; k < list.length; k++) {
-          const c = list[k];
-          if (c.start >= clipEnd(a) - EPS) break;
-          return { trackId, clipIds: [a.id, b.id, c.id], reason: 'too-many-layers' };
-        }
+        // A third clip starting before `a` ends makes three layers at once.
+        const c = list[j + 1];
+        if (c && c.start < clipEnd(a) - EPS) return { trackId, clipIds: [a.id, b.id, c.id], reason: 'too-many-layers' };
       }
     }
   }

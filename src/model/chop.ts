@@ -1,6 +1,7 @@
 // Turning regions of a long sample (a whole song) into arrangement clips.
-import type { AudioClip, Beats, SampleMeta, Seconds } from './types';
+
 import { createAudioClip } from './project';
+import type { AudioClip, Beats, SampleMeta, Seconds } from './types';
 
 /** A sample with a beat grid places its clips in tempo mode, so slices stay in time with the project. */
 function gridExtra(meta: SampleMeta): Partial<AudioClip> {

@@ -1,6 +1,6 @@
-import { test, expect, type Page } from '@playwright/test';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { expect, type Page, test } from '@playwright/test';
 
 const FIX = fileURLToPath(new URL('./fixtures/', import.meta.url));
 const files = ['chords-phrase.wav', 'drum-loop.wav', 'pluck-c4.wav', 'texture.wav'].map((f) => path.join(FIX, f));
@@ -63,7 +63,10 @@ test('loop wraps playback', async ({ page }) => {
   const band = page.locator('.ruler-loop');
   const b = (await band.boundingBox())!;
   const ppb = await page.evaluate(() => (window as any).__afterimage.ui.pxPerBeat);
-  await page.locator('.lane').nth(5).click({ position: { x: 40, y: 20 } });
+  await page
+    .locator('.lane')
+    .nth(5)
+    .click({ position: { x: 40, y: 20 } });
   await page.mouse.move(b.x + 16 * ppb, b.y + 6);
   await page.mouse.down();
   await page.mouse.move(b.x + 4 * ppb, b.y + 6, { steps: 6 });
@@ -90,7 +93,10 @@ test('gate 3: sections, tracker, input recording and prints with correct routing
   expect((await state(page)).markers).toHaveLength(3);
   // Tracker part on track 3 using the pluck instrument.
   await page.locator('.pool-item.sample').nth(2).getByRole('button', { name: 'Instrument' }).click();
-  await page.locator('.lane').nth(2).dblclick({ position: { x: 4, y: 30 } });
+  await page
+    .locator('.lane')
+    .nth(2)
+    .dblclick({ position: { x: 4, y: 30 } });
   await page.locator('.tracker-grid').focus();
   for (const k of ['z', 'c', 'b', 'q']) await page.keyboard.press(k);
   const st = await state(page);
@@ -117,13 +123,22 @@ test('gate 3: sections, tracker, input recording and prints with correct routing
       const meta = project.samples.filter((s: any) => s.name.startsWith(n)).at(-1);
       const s = samples.get(meta.id);
       const ch = s.buffer.getChannelData(0);
-      let peak = 0, first = -1;
+      let peak = 0,
+        first = -1;
       for (let i = 0; i < ch.length; i++) {
         const v = Math.abs(ch[i]);
         if (v > peak) peak = v;
         if (first < 0 && v > 0.05) first = i;
       }
-      return { peak, first: first / s.buffer.sampleRate, channels: s.buffer.numberOfChannels, duration: s.buffer.duration, kind: meta.kind, capture: meta.capture, beats: meta.beats };
+      return {
+        peak,
+        first: first / s.buffer.sampleRate,
+        channels: s.buffer.numberOfChannels,
+        duration: s.buffer.duration,
+        kind: meta.kind,
+        capture: meta.capture,
+        beats: meta.beats,
+      };
     }, name);
 
   const empty = await analyse('Print · Track 4');
@@ -240,6 +255,10 @@ test('gate 4: reopen captured audio and export a two-minute song', async ({ page
     return Math.abs(x / 0x800000);
   };
   let first = -1;
-  for (let f = frame - 2400; f < frame + 2400; f++) if (at(f) > 0.05) { first = f; break; }
+  for (let f = frame - 2400; f < frame + 2400; f++)
+    if (at(f) > 0.05) {
+      first = f;
+      break;
+    }
   expect(Math.abs(first - frame) / sampleRate).toBeLessThan(0.003);
 });

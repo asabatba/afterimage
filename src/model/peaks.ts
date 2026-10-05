@@ -15,7 +15,8 @@ export function computePeaks(channels: Float32Array[], sampleRate: number, binSi
   const min = new Float32Array(bins);
   const max = new Float32Array(bins);
   for (let b = 0; b < bins; b++) {
-    let lo = Infinity, hi = -Infinity;
+    let lo = Infinity,
+      hi = -Infinity;
     const end = Math.min(frames, (b + 1) * binSize);
     for (let i = b * binSize; i < end; i++) {
       for (let c = 0; c < channels.length; c++) {
@@ -31,9 +32,11 @@ export function computePeaks(channels: Float32Array[], sampleRate: number, binSi
   while (levels.at(-1)!.min.length > 1) {
     const prev = levels.at(-1)!;
     const n = Math.ceil(prev.min.length / 2);
-    const lmin = new Float32Array(n), lmax = new Float32Array(n);
+    const lmin = new Float32Array(n),
+      lmax = new Float32Array(n);
     for (let i = 0; i < n; i++) {
-      const a = 2 * i, b = Math.min(2 * i + 1, prev.min.length - 1);
+      const a = 2 * i,
+        b = Math.min(2 * i + 1, prev.min.length - 1);
       lmin[i] = Math.min(prev.min[a], prev.min[b]);
       lmax[i] = Math.max(prev.max[a], prev.max[b]);
     }
@@ -57,7 +60,8 @@ export function peakSpan(p: Peaks, t0: number, t1: number): [number, number] {
   const L = p.levels[level];
   const b0 = Math.floor(f0 / size);
   const b1 = Math.min(L.min.length - 1, Math.max(b0, Math.ceil(f1 / size) - 1));
-  let lo = Infinity, hi = -Infinity;
+  let lo = Infinity,
+    hi = -Infinity;
   for (let b = b0; b <= b1; b++) {
     if (L.min[b] < lo) lo = L.min[b];
     if (L.max[b] > hi) hi = L.max[b];

@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
 test('gate 2: independent pitch and time, offline export', async ({ page }) => {
   page.on('console', (m) => console.log('[page]', m.text()));

@@ -1,11 +1,10 @@
-import { For, createEffect, createSignal, on, onCleanup, onMount } from 'solid-js';
+import { createEffect, createSignal, For, on, onCleanup, onMount } from 'solid-js';
+import { keyToNote, noteName } from '../model/tracker';
 import type { Instrument, Project } from '../model/types';
-import { noteName } from '../model/tracker';
-import { audio, beginGesture, endGesture, live, project, samples, samplesVersion } from '../store/app';
 import { updateInstrument } from '../store/actions';
-import { NumberField, Slider, Toggle, bindEdit, fmtHz, fmtSigned } from './controls';
+import { audio, beginGesture, endGesture, live, project, samples, samplesVersion } from '../store/app';
+import { bindEdit, fmtHz, fmtSigned, NumberField, Slider, Toggle } from './controls';
 import { drawSampleWave, setupCanvas } from './draw';
-import { keyToNote } from '../model/tracker';
 
 function insEdit(id: string, label: string, fn: (i: Instrument, v: number, p: Project) => void) {
   return bindEdit(label, (p, v) => {
@@ -66,20 +65,95 @@ export function SamplerEditor(props: { instrument: Instrument }) {
       <div class="insp-controls">
         <fieldset>
           <legend>Tuning</legend>
-          <NumberField label="Root" value={ins().rootNote} min={0} max={127} step={1} dragPx={6} format={(v) => noteName(v)} edit={insEdit(id(), 'root note', (i, v) => (i.rootNote = v))} title="The note at which the sample plays at its recorded pitch" />
-          <NumberField label="Fine" value={ins().fineTune} min={-100} max={100} step={1} dragPx={2} unit="ct" format={(v) => fmtSigned(v)} edit={insEdit(id(), 'fine tune', (i, v) => (i.fineTune = v))} />
-          <NumberField label="Gain" value={ins().gainDb} min={-48} max={12} step={0.1} dragPx={2} unit="dB" format={(v) => fmtSigned(v, 1)} edit={insEdit(id(), 'gain', (i, v) => (i.gainDb = v))} />
+          <NumberField
+            label="Root"
+            value={ins().rootNote}
+            min={0}
+            max={127}
+            step={1}
+            dragPx={6}
+            format={(v) => noteName(v)}
+            edit={insEdit(id(), 'root note', (i, v) => (i.rootNote = v))}
+            title="The note at which the sample plays at its recorded pitch"
+          />
+          <NumberField
+            label="Fine"
+            value={ins().fineTune}
+            min={-100}
+            max={100}
+            step={1}
+            dragPx={2}
+            unit="ct"
+            format={(v) => fmtSigned(v)}
+            edit={insEdit(id(), 'fine tune', (i, v) => (i.fineTune = v))}
+          />
+          <NumberField
+            label="Gain"
+            value={ins().gainDb}
+            min={-48}
+            max={12}
+            step={0.1}
+            dragPx={2}
+            unit="dB"
+            format={(v) => fmtSigned(v, 1)}
+            edit={insEdit(id(), 'gain', (i, v) => (i.gainDb = v))}
+          />
         </fieldset>
         <fieldset>
           <legend>Envelope</legend>
-          <NumberField label="Attack" value={ins().env.attack * 1000} min={1} max={5000} step={1} dragPx={1} unit="ms" format={(v) => v.toFixed(0)} edit={insEdit(id(), 'attack', (i, v) => (i.env.attack = v / 1000))} />
-          <NumberField label="Decay" value={ins().env.decay * 1000} min={1} max={10000} step={5} dragPx={1} unit="ms" format={(v) => v.toFixed(0)} edit={insEdit(id(), 'decay', (i, v) => (i.env.decay = v / 1000))} />
-          <NumberField label="Sustain" value={ins().env.sustain * 100} min={0} max={100} step={1} dragPx={2} unit="%" format={(v) => v.toFixed(0)} edit={insEdit(id(), 'sustain', (i, v) => (i.env.sustain = v / 100))} />
-          <NumberField label="Release" value={ins().env.release * 1000} min={5} max={10000} step={5} dragPx={1} unit="ms" format={(v) => v.toFixed(0)} edit={insEdit(id(), 'release', (i, v) => (i.env.release = v / 1000))} />
+          <NumberField
+            label="Attack"
+            value={ins().env.attack * 1000}
+            min={1}
+            max={5000}
+            step={1}
+            dragPx={1}
+            unit="ms"
+            format={(v) => v.toFixed(0)}
+            edit={insEdit(id(), 'attack', (i, v) => (i.env.attack = v / 1000))}
+          />
+          <NumberField
+            label="Decay"
+            value={ins().env.decay * 1000}
+            min={1}
+            max={10000}
+            step={5}
+            dragPx={1}
+            unit="ms"
+            format={(v) => v.toFixed(0)}
+            edit={insEdit(id(), 'decay', (i, v) => (i.env.decay = v / 1000))}
+          />
+          <NumberField
+            label="Sustain"
+            value={ins().env.sustain * 100}
+            min={0}
+            max={100}
+            step={1}
+            dragPx={2}
+            unit="%"
+            format={(v) => v.toFixed(0)}
+            edit={insEdit(id(), 'sustain', (i, v) => (i.env.sustain = v / 100))}
+          />
+          <NumberField
+            label="Release"
+            value={ins().env.release * 1000}
+            min={5}
+            max={10000}
+            step={5}
+            dragPx={1}
+            unit="ms"
+            format={(v) => v.toFixed(0)}
+            edit={insEdit(id(), 'release', (i, v) => (i.env.release = v / 1000))}
+          />
         </fieldset>
         <fieldset>
           <legend>Loop and filter</legend>
-          <Toggle label="Loop" on={ins().loop} onChange={(v) => updateInstrument(id(), v ? 'loop on' : 'loop off', { loop: v })} title="Sustain by looping between the blue markers" />
+          <Toggle
+            label="Loop"
+            on={ins().loop}
+            onChange={(v) => updateInstrument(id(), v ? 'loop on' : 'loop off', { loop: v })}
+            title="Sustain by looping between the blue markers"
+          />
           <Slider
             label="Cutoff"
             min={Math.log2(40)}
@@ -88,7 +162,16 @@ export function SamplerEditor(props: { instrument: Instrument }) {
             format={() => fmtHz(ins().filterCutoff)}
             edit={insEdit(id(), 'cutoff', (i, v) => (i.filterCutoff = Math.round(2 ** v)))}
           />
-          <NumberField label="Resonance" value={ins().filterQ} min={0.1} max={20} step={0.1} dragPx={3} format={(v) => v.toFixed(1)} edit={insEdit(id(), 'resonance', (i, v) => (i.filterQ = v))} />
+          <NumberField
+            label="Resonance"
+            value={ins().filterQ}
+            min={0.1}
+            max={20}
+            step={0.1}
+            dragPx={3}
+            format={(v) => v.toFixed(1)}
+            edit={insEdit(id(), 'resonance', (i, v) => (i.filterQ = v))}
+          />
         </fieldset>
       </div>
     </div>
@@ -152,8 +235,20 @@ function InstrumentWave(props: { instrument: Instrument }) {
       <div class="region-dim" style={{ left: `${x(props.instrument.end)}px`, right: 0 }} />
       <div class="region-handle" style={{ left: `${x(props.instrument.start)}px` }} onPointerDown={(e) => drag(e, 'start')} title="Sample start" />
       <div class="region-handle end" style={{ left: `${x(props.instrument.end)}px` }} onPointerDown={(e) => drag(e, 'end')} title="Sample end" />
-      <div class="loop-handle" classList={{ off: !props.instrument.loop }} style={{ left: `${x(props.instrument.loopStart)}px` }} onPointerDown={(e) => drag(e, 'loopStart')} title="Loop start" />
-      <div class="loop-handle end" classList={{ off: !props.instrument.loop }} style={{ left: `${x(props.instrument.loopEnd)}px` }} onPointerDown={(e) => drag(e, 'loopEnd')} title="Loop end" />
+      <div
+        class="loop-handle"
+        classList={{ off: !props.instrument.loop }}
+        style={{ left: `${x(props.instrument.loopStart)}px` }}
+        onPointerDown={(e) => drag(e, 'loopStart')}
+        title="Loop start"
+      />
+      <div
+        class="loop-handle end"
+        classList={{ off: !props.instrument.loop }}
+        style={{ left: `${x(props.instrument.loopEnd)}px` }}
+        onPointerDown={(e) => drag(e, 'loopEnd')}
+        title="Loop end"
+      />
     </div>
   );
 }

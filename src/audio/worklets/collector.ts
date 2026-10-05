@@ -15,7 +15,10 @@ export function attachCollector(port: MessagePort, onTake: (t: Take) => void) {
     if (d.type === 'chunk') {
       const bufs = d.buffers as Float32Array[];
       chunks.push({ seq: d.seq, frames: d.frames, data: bufs.map((b) => b.slice(0, d.frames)) });
-      port.postMessage({ type: 'return', buffers: bufs }, bufs.map((b) => b.buffer));
+      port.postMessage(
+        { type: 'return', buffers: bufs },
+        bufs.map((b) => b.buffer),
+      );
     } else if (d.type === 'end') {
       chunks.sort((a, b) => a.seq - b.seq);
       const nch = chunks[0]?.data.length ?? 2;

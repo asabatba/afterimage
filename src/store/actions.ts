@@ -1,32 +1,19 @@
 // User-level operations. Every edit goes through commit()/gestures so it is undoable.
 import { createSignal } from 'solid-js';
 import { unwrap } from 'solid-js/store';
-import type { AudioClip, BeatGrid, Clip, Instrument, Pattern, PatternClip, Project, SampleKind, SampleMeta, SampleSourceRef, Track } from '../model/types';
-import { createAudioClip, createInstrument, createPatternClip, createTrack, newId } from '../model/project';
-import { clonePattern, createPattern, noteName } from '../model/tracker';
-import { BEATS_PER_BAR, EPS, clipEnd, normalizeClip, snapBeat } from '../model/timing';
-import { duplicateClip, fillClips, groupSpan, pasteClips, repeatClips, songEnd, splitClip } from '../model/clips';
-import { regionClip, sliceClips } from '../model/chop';
-import { detectNote } from '../model/analysis';
-import { encodeWav, type WavFormat } from '../model/wav';
-import { bufferFromChannels, channelsOf } from '../audio/samples';
-import { renderOffline } from '../audio/export';
 import { CaptureError, type CaptureTake } from '../audio/capture';
+import { renderOffline } from '../audio/export';
+import { bufferFromChannels, channelsOf } from '../audio/samples';
+import { detectNote } from '../model/analysis';
+import { regionClip, sliceClips } from '../model/chop';
+import { duplicateClip, fillClips, groupSpan, pasteClips, repeatClips, songEnd, splitClip } from '../model/clips';
+import { createAudioClip, createInstrument, createPatternClip, createTrack, newId } from '../model/project';
+import { BEATS_PER_BAR, clipEnd, EPS, normalizeClip, snapBeat } from '../model/timing';
+import { clonePattern, createPattern, noteName } from '../model/tracker';
+import type { AudioClip, BeatGrid, Clip, Instrument, Pattern, PatternClip, Project, SampleKind, SampleMeta, SampleSourceRef, Track } from '../model/types';
+import { encodeWav, type WavFormat } from '../model/wav';
+import { audio, commit, normalizeAll, playhead, project, samples, selectClips, selectedClipIds, setPlayhead, setUi, toast, ui } from './app';
 import { saveSample } from './db';
-import {
-  audio,
-  commit,
-  normalizeAll,
-  playhead,
-  project,
-  samples,
-  selectClips,
-  selectedClipIds,
-  setPlayhead,
-  setUi,
-  toast,
-  ui,
-} from './app';
 
 // ── Samples ──────────────────────────────────────────────────────────────
 
@@ -96,19 +83,27 @@ export function openSample(id: string) {
 
 /** Set (or clear) a sample's beat grid. */
 export function setSampleGrid(id: string, grid: BeatGrid | undefined, label = 'edit beat grid') {
-  commit(label, (p) => {
-    const s = p.samples.find((x) => x.id === id);
-    if (!s) return;
-    if (grid) s.grid = { bpm: Math.round(grid.bpm * 1000) / 1000, offset: grid.offset };
-    else delete s.grid;
-  }, { checkOverlaps: false });
+  commit(
+    label,
+    (p) => {
+      const s = p.samples.find((x) => x.id === id);
+      if (!s) return;
+      if (grid) s.grid = { bpm: Math.round(grid.bpm * 1000) / 1000, offset: grid.offset };
+      else delete s.grid;
+    },
+    { checkOverlaps: false },
+  );
 }
 
 export function renameSample(id: string, name: string) {
-  commit('rename sample', (p) => {
-    const s = p.samples.find((x) => x.id === id);
-    if (s) s.name = name;
-  }, { checkOverlaps: false });
+  commit(
+    'rename sample',
+    (p) => {
+      const s = p.samples.find((x) => x.id === id);
+      if (s) s.name = name;
+    },
+    { checkOverlaps: false },
+  );
 }
 
 export function sampleUsage(id: string) {
@@ -124,9 +119,13 @@ export function removeSample(id: string) {
     toast('That sample is still used by clips or instruments.', 'warn');
     return;
   }
-  commit('remove sample', (p) => {
-    p.samples = p.samples.filter((s) => s.id !== id);
-  }, { checkOverlaps: false });
+  commit(
+    'remove sample',
+    (p) => {
+      p.samples = p.samples.filter((s) => s.id !== id);
+    },
+    { checkOverlaps: false },
+  );
 }
 
 // ── Clips ────────────────────────────────────────────────────────────────
@@ -261,13 +260,13 @@ interface ClipboardData {
 }
 let clipboard: ClipboardData | null = null;
 const [clipboardCount, setClipboardCount] = createSignal(0);
+
 /** Reactive: how many clips are on the clipboard. */
 export { clipboardCount };
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
-const selectedClips = (): Clip[] =>
-  project.clips.filter((c) => selectedClipIds().includes(c.id)).map((c) => structuredClone(unwrap(c)) as Clip);
+const selectedClips = (): Clip[] => project.clips.filter((c) => selectedClipIds().includes(c.id)).map((c) => structuredClone(unwrap(c)) as Clip);
 
 export function copySelected(quiet = false): boolean {
   const clips = selectedClips();
@@ -312,7 +311,7 @@ function repeatStep(group: Clip[]): number | undefined {
   return Math.max(1, Math.ceil(groupSpan(group).length / unit - 1e-9)) * unit;
 }
 
-const sampleDurationOf = (c: Clip) => (c.kind === 'audio' ? project.samples.find((s) => s.id === c.sampleId)?.duration ?? Infinity : Infinity);
+const sampleDurationOf = (c: Clip) => (c.kind === 'audio' ? (project.samples.find((s) => s.id === c.sampleId)?.duration ?? Infinity) : Infinity);
 
 export function repeatSelected(count = ui.tools.repeatCount) {
   const group = selectedClips();
@@ -384,15 +383,19 @@ export function splitAt(beat: number) {
 }
 
 export function makeUnique(clipId: string) {
-  commit('make unique', (p) => {
-    const c = p.clips.find((x) => x.id === clipId) as PatternClip | undefined;
-    const src = c && p.patterns.find((x) => x.id === c.patternId);
-    if (!c || !src) return;
-    const copy = clonePattern(unwrap(src), `${src.name}·${p.patterns.length + 1}`);
-    p.patterns.push(copy);
-    c.patternId = copy.id;
-    c.name = copy.name;
-  }, { checkOverlaps: false });
+  commit(
+    'make unique',
+    (p) => {
+      const c = p.clips.find((x) => x.id === clipId) as PatternClip | undefined;
+      const src = c && p.patterns.find((x) => x.id === c.patternId);
+      if (!c || !src) return;
+      const copy = clonePattern(unwrap(src), `${src.name}·${p.patterns.length + 1}`);
+      p.patterns.push(copy);
+      c.patternId = copy.id;
+      c.name = copy.name;
+    },
+    { checkOverlaps: false },
+  );
 }
 
 export function linkedCount(patternId: string) {
@@ -400,36 +403,52 @@ export function linkedCount(patternId: string) {
 }
 
 export function updatePattern(id: string, label: string, fn: (p: Pattern) => Pattern) {
-  commit(label, (proj) => {
-    const i = proj.patterns.findIndex((x) => x.id === id);
-    if (i >= 0) proj.patterns[i] = fn(unwrap(proj.patterns[i]));
-  }, { checkOverlaps: false });
+  commit(
+    label,
+    (proj) => {
+      const i = proj.patterns.findIndex((x) => x.id === id);
+      if (i >= 0) proj.patterns[i] = fn(unwrap(proj.patterns[i]));
+    },
+    { checkOverlaps: false },
+  );
 }
 
 // ── Tracks ───────────────────────────────────────────────────────────────
 
 export function addTrack() {
-  commit('add track', (p) => {
-    p.tracks.push(createTrack(p.tracks.length));
-  }, { checkOverlaps: false });
+  commit(
+    'add track',
+    (p) => {
+      p.tracks.push(createTrack(p.tracks.length));
+    },
+    { checkOverlaps: false },
+  );
 }
 
 export function removeTrack(id: string) {
   const n = project.clips.filter((c) => c.trackId === id).length;
   if (project.tracks.length <= 1) return;
   if (n && !confirm(`Remove this track and its ${n} clip${n > 1 ? 's' : ''}?`)) return;
-  commit('remove track', (p) => {
-    p.tracks = p.tracks.filter((t) => t.id !== id);
-    p.clips = p.clips.filter((c) => c.trackId !== id);
-    prunePatterns(p);
-  }, { checkOverlaps: false });
+  commit(
+    'remove track',
+    (p) => {
+      p.tracks = p.tracks.filter((t) => t.id !== id);
+      p.clips = p.clips.filter((c) => c.trackId !== id);
+      prunePatterns(p);
+    },
+    { checkOverlaps: false },
+  );
 }
 
 export function updateTrack(id: string, label: string, patch: Partial<Track>) {
-  commit(label, (p) => {
-    const t = p.tracks.find((x) => x.id === id);
-    if (t) Object.assign(t, patch);
-  }, { checkOverlaps: false });
+  commit(
+    label,
+    (p) => {
+      const t = p.tracks.find((x) => x.id === id);
+      if (t) Object.assign(t, patch);
+    },
+    { checkOverlaps: false },
+  );
 }
 
 // ── Markers, loop, tempo ─────────────────────────────────────────────────
@@ -438,24 +457,36 @@ export function addMarker(beat: number) {
   const b = snapBeat(beat, BEATS_PER_BAR, true);
   if (project.markers.some((m) => Math.abs(m.beat - b) < 1e-6)) return;
   const letter = String.fromCharCode(65 + (project.markers.length % 26));
-  commit('add section', (p) => {
-    p.markers.push({ id: newId('m'), beat: b, name: `Section ${letter}` });
-    p.markers.sort((a, z) => a.beat - z.beat);
-  }, { checkOverlaps: false });
+  commit(
+    'add section',
+    (p) => {
+      p.markers.push({ id: newId('m'), beat: b, name: `Section ${letter}` });
+      p.markers.sort((a, z) => a.beat - z.beat);
+    },
+    { checkOverlaps: false },
+  );
 }
 
 export function updateMarker(id: string, patch: { beat?: number; name?: string }) {
-  commit('edit section', (p) => {
-    const m = p.markers.find((x) => x.id === id);
-    if (m) Object.assign(m, patch);
-    p.markers.sort((a, z) => a.beat - z.beat);
-  }, { checkOverlaps: false });
+  commit(
+    'edit section',
+    (p) => {
+      const m = p.markers.find((x) => x.id === id);
+      if (m) Object.assign(m, patch);
+      p.markers.sort((a, z) => a.beat - z.beat);
+    },
+    { checkOverlaps: false },
+  );
 }
 
 export function removeMarker(id: string) {
-  commit('remove section', (p) => {
-    p.markers = p.markers.filter((m) => m.id !== id);
-  }, { checkOverlaps: false });
+  commit(
+    'remove section',
+    (p) => {
+      p.markers = p.markers.filter((m) => m.id !== id);
+    },
+    { checkOverlaps: false },
+  );
 }
 
 /** Beat range of the section starting at a marker (to the next marker or song end). */
@@ -468,10 +499,14 @@ export function sectionRange(markerId: string): [number, number] | null {
 }
 
 export function setLoop(patch: Partial<Project['loop']>) {
-  commit('loop range', (p) => {
-    Object.assign(p.loop, patch);
-    if (p.loop.end < p.loop.start) [p.loop.start, p.loop.end] = [p.loop.end, p.loop.start];
-  }, { checkOverlaps: false });
+  commit(
+    'loop range',
+    (p) => {
+      Object.assign(p.loop, patch);
+      if (p.loop.end < p.loop.start) [p.loop.start, p.loop.end] = [p.loop.end, p.loop.start];
+    },
+    { checkOverlaps: false },
+  );
 }
 
 export function setBpm(bpm: number) {
@@ -530,16 +565,24 @@ export function instrumentFromRegion(sampleId: string, from: number, to: number,
 }
 
 export function updateInstrument(id: string, label: string, patch: Partial<Instrument>) {
-  commit(label, (p) => {
-    const i = p.instruments.find((x) => x.id === id);
-    if (i) Object.assign(i, patch);
-  }, { checkOverlaps: false });
+  commit(
+    label,
+    (p) => {
+      const i = p.instruments.find((x) => x.id === id);
+      if (i) Object.assign(i, patch);
+    },
+    { checkOverlaps: false },
+  );
 }
 
 export function removeInstrument(id: string) {
-  commit('remove instrument', (p) => {
-    p.instruments = p.instruments.filter((i) => i.id !== id);
-  }, { checkOverlaps: false });
+  commit(
+    'remove instrument',
+    (p) => {
+      p.instruments = p.instruments.filter((i) => i.id !== id);
+    },
+    { checkOverlaps: false },
+  );
   if (ui.tracker.instrumentId === id) setUi('tracker', 'instrumentId', project.instruments[0]?.id ?? null);
 }
 
@@ -584,7 +627,11 @@ export async function startCapture() {
   const destTrackId = c.destTrackId ?? project.tracks[0]?.id;
   if (!destTrackId) return;
   const source =
-    c.source === 'input' ? ({ kind: 'input' } as const) : c.source === 'master' ? ({ kind: 'master' } as const) : ({ kind: 'track', trackId: c.source } as const);
+    c.source === 'input'
+      ? ({ kind: 'input' } as const)
+      : c.source === 'master'
+        ? ({ kind: 'master' } as const)
+        : ({ kind: 'track', trackId: c.source } as const);
   if (source.kind === 'track' && source.trackId === destTrackId) {
     // Allowed (the clip appears only when capture ends), but worth a heads-up.
     toast('Printing a track onto itself — the new clip will overlap the source.', 'warn');

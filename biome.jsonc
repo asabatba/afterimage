@@ -1,0 +1,56 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.5.15/schema.json",
+  "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
+  "files": {
+    "ignoreUnknown": true,
+    // The vendored Signalsmith build is third-party code (see src/vendor/README.md): never reformat it.
+    "includes": ["**", "!src/vendor/signalsmith-stretch.mjs", "!pnpm-lock.yaml"]
+  },
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 160
+  },
+  "javascript": {
+    "formatter": { "quoteStyle": "single", "jsxQuoteStyle": "double", "semicolons": "always", "trailingCommas": "all" }
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "preset": "recommended",
+      "style": {
+        // Used throughout for DOM refs, drag-and-drop payloads and Solid's keyed <Show>/<Match>.
+        "noNonNullAssertion": "off",
+        // The source-order of this stylesheet is deliberate (components are grouped, not sorted by specificity).
+        "noDescendingSpecificity": "off"
+      },
+      "suspicious": {
+        // `any` appears at the boundaries: the dev test hook, caught errors, project JSON migration.
+        "noExplicitAny": "off",
+        // `(el) => (el.focus(), el.select())` and `forEach((l) => l())` are idioms this codebase uses on purpose.
+        "useIterableCallbackReturn": "off"
+      },
+      "complexity": {
+        "noCommaOperator": "off",
+        // Only used in the reduced-motion and print overrides, where it is the point.
+        "noImportantStyles": "off"
+      },
+      "a11y": {
+        // The arrangement, waveform and tracker are pointer-driven canvases with their own keyboard handling.
+        // These stay visible as warnings: they are a real accessibility backlog, not noise.
+        "noStaticElementInteractions": "warn",
+        "useSemanticElements": "warn",
+        "useAriaPropsSupportedByRole": "warn",
+        "useFocusableInteractive": "warn",
+        "noNoninteractiveTabindex": "warn",
+        "useKeyWithClickEvents": "warn"
+      }
+    },
+    "domains": { "solid": "recommended" }
+  },
+  "assist": {
+    "enabled": true,
+    "actions": { "source": { "organizeImports": "on" } }
+  }
+}

@@ -1,11 +1,11 @@
-import { Show, createSignal, onCleanup } from 'solid-js';
+import { createSignal, onCleanup, Show } from 'solid-js';
 import { BEATS_PER_BAR, beatsToSec, formatBBT, formatTime } from '../model/timing';
-import { audio, canRedo, canUndo, playhead, playing, project, redo, setUi, ui, undo, undoLabel } from '../store/app';
 import { setBpm, setLoop, startCapture, stop, togglePlay } from '../store/actions';
+import { audio, canRedo, canUndo, playhead, playing, project, redo, setUi, ui, undo, undoLabel } from '../store/app';
 import { exportBundle, importBundle } from '../store/session';
 import { arrangementView } from './Arrangement';
-import { NumberField, Toggle } from './controls';
 import { captureStatus } from './captureState';
+import { NumberField, Toggle } from './controls';
 
 const GRIDS: { v: number; label: string }[] = [
   { v: 4, label: 'Bar' },
@@ -37,8 +37,17 @@ export function Transport() {
 
       <div class="tp-group" role="group" aria-label="Transport">
         <button type="button" class="tp-btn play" aria-pressed={playing()} onClick={togglePlay} title="Play / stop (Space)">
-          <Show when={playing()} fallback={<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2.5v11l9-5.5z" /></svg>}>
-            <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="3.5" y="3.5" width="9" height="9" /></svg>
+          <Show
+            when={playing()}
+            fallback={
+              <svg viewBox="0 0 16 16" aria-hidden="true">
+                <path d="M4 2.5v11l9-5.5z" />
+              </svg>
+            }
+          >
+            <svg viewBox="0 0 16 16" aria-hidden="true">
+              <rect x="3.5" y="3.5" width="9" height="9" />
+            </svg>
           </Show>
           <span class="sr">{playing() ? 'Stop' : 'Play'}</span>
         </button>
@@ -49,7 +58,9 @@ export function Transport() {
           onClick={() => (capturing() ? stop() : (setUi('captureOpen', true), void startCapture()))}
           title={capturing() ? 'Stop capture' : 'Start capture with the settings in the capture panel (R)'}
         >
-          <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="4.5" /></svg>
+          <svg viewBox="0 0 16 16" aria-hidden="true">
+            <circle cx="8" cy="8" r="4.5" />
+          </svg>
           <span class="sr">{capturing() ? 'Stop capture' : 'Record or print'}</span>
         </button>
       </div>
@@ -72,7 +83,9 @@ export function Transport() {
           edit={{ begin() {}, change: (v) => setBpm(v), end() {} }}
           title="Project tempo. Drag, use arrow keys, or double-click to type."
         />
-        <span class="tp-meter-sig" title="Time signature">4/4</span>
+        <span class="tp-meter-sig" title="Time signature">
+          4/4
+        </span>
       </div>
 
       <div class="tp-group">
@@ -98,7 +111,13 @@ export function Transport() {
         <button type="button" class="ghost" onClick={() => setUi('pxPerBeat', Math.max(3, ui.pxPerBeat / 1.25))} title="Zoom out (−)" aria-label="Zoom out">
           −
         </button>
-        <button type="button" class="ghost" onClick={() => setUi('pxPerBeat', Math.min(400, ui.pxPerBeat * 1.25))} title="Zoom in (+, or Ctrl+wheel)" aria-label="Zoom in">
+        <button
+          type="button"
+          class="ghost"
+          onClick={() => setUi('pxPerBeat', Math.min(400, ui.pxPerBeat * 1.25))}
+          title="Zoom in (+, or Ctrl+wheel)"
+          aria-label="Zoom in"
+        >
           +
         </button>
         <button type="button" class="ghost" onClick={() => arrangementView.fit()} title="Fit the whole song in view. Z zooms to the selected clips.">

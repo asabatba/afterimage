@@ -39,7 +39,8 @@ function plan(n: number): FftPlan {
   if (p) return p;
   const bits = Math.round(Math.log2(n));
   if (1 << bits !== n) throw new Error('FFT size must be a power of two');
-  const cos = new Float64Array(n / 2), sin = new Float64Array(n / 2);
+  const cos = new Float64Array(n / 2),
+    sin = new Float64Array(n / 2);
   for (let i = 0; i < n / 2; i++) {
     cos[i] = Math.cos((2 * Math.PI * i) / n);
     sin[i] = Math.sin((2 * Math.PI * i) / n);
@@ -63,8 +64,12 @@ export function fft(re: Float64Array, im: Float64Array) {
   for (let i = 0; i < n; i++) {
     const j = rev[i];
     if (j > i) {
-      const tr = re[i]; re[i] = re[j]; re[j] = tr;
-      const ti = im[i]; im[i] = im[j]; im[j] = ti;
+      const tr = re[i];
+      re[i] = re[j];
+      re[j] = tr;
+      const ti = im[i];
+      im[i] = im[j];
+      im[j] = ti;
     }
   }
   for (let size = 2; size <= n; size <<= 1) {
@@ -72,8 +77,10 @@ export function fft(re: Float64Array, im: Float64Array) {
     const step = n / size;
     for (let start = 0; start < n; start += size) {
       for (let k = 0, t = 0; k < half; k++, t += step) {
-        const a = start + k, b = a + half;
-        const wr = cos[t], wi = -sin[t];
+        const a = start + k,
+          b = a + half;
+        const wr = cos[t],
+          wi = -sin[t];
         const xr = re[b] * wr - im[b] * wi;
         const xi = re[b] * wi + im[b] * wr;
         re[b] = re[a] - xr;
@@ -123,7 +130,8 @@ export async function onsetEnvelope(channels: Float32Array[], sampleRate: number
   const frames = total >= frame ? Math.floor((total - frame) / hop) + 1 : 0;
   const env = new Float32Array(frames);
   const { hann } = plan(frame);
-  const re = new Float64Array(frame), im = new Float64Array(frame);
+  const re = new Float64Array(frame),
+    im = new Float64Array(frame);
   const maxBin = Math.min(frame / 2 - 1, Math.floor(10000 / (sampleRate / frame)));
   const prev = new Float64Array(maxBin + 1);
   const scale = 1 / (frame * 0.25);
@@ -164,7 +172,8 @@ export function pickOnsets(oe: OnsetEnvelope, sensitivity = 1, minGap = 0.05): S
   for (let i = 1; i < n - 1; i++) {
     const v = env[i];
     if (v < env[i - 1] || v <= env[i + 1]) continue;
-    const a = Math.max(0, i - w), b = Math.min(n, i + w + 1);
+    const a = Math.max(0, i - w),
+      b = Math.min(n, i + w + 1);
     const mean = (pre[b] - pre[a]) / (b - a);
     if (v <= mean * (1 + 0.9 / sens) + (max * 0.05) / sens) continue;
     const t = i * hopSec + frameSec * 0.5;
@@ -193,7 +202,8 @@ export function refineOnset(channels: Float32Array[], sampleRate: number, t: Sec
   }
   const pre = new Float64Array(len + 1);
   for (let i = 0; i < len; i++) pre[i + 1] = pre[i] + a[i];
-  let best = -Infinity, at = 0;
+  let best = -Infinity,
+    at = 0;
   for (let i = 0; i + 2 * box <= len; i++) {
     const rise = pre[i + 2 * box] - pre[i + box] - (pre[i + box] - pre[i]);
     if (rise > best) {
@@ -233,17 +243,20 @@ function detrend(env: Float32Array, w: number): Float32Array {
   for (let i = 0; i < n; i++) pre[i + 1] = pre[i] + env[i];
   const out = new Float32Array(n);
   for (let i = 0; i < n; i++) {
-    const a = Math.max(0, i - w), b = Math.min(n, i + w + 1);
+    const a = Math.max(0, i - w),
+      b = Math.min(n, i + w + 1);
     out[i] = Math.max(0, env[i] - (pre[b] - pre[a]) / (b - a));
   }
   return out;
 }
 
 function comb(o: Float32Array, period: number, phase: number, end = o.length): number {
-  let s = 0, c = 0;
+  let s = 0,
+    c = 0;
   const last = Math.min(end, o.length) - 1;
   for (let t = phase; t < last; t += period) {
-    const i = t | 0, f = t - i;
+    const i = t | 0,
+      f = t - i;
     s += o[i] * (1 - f) + o[i + 1] * f;
     c++;
   }
@@ -256,7 +269,10 @@ function bestComb(o: Float32Array, bpmLo: number, bpmHi: number, bpmStep: number
   let best = { bpm: bpmLo, phase: 0, score: -1, mean: 0 };
   for (let b = bpmLo; b <= bpmHi + 1e-9; b += bpmStep) {
     const P = 60 / (b * hopSec);
-    let sum = 0, cnt = 0, top = -1, topPhase = 0;
+    let sum = 0,
+      cnt = 0,
+      top = -1,
+      topPhase = 0;
     for (let ph = 0; ph < P; ph += 0.5) {
       const s = comb(seg, P, ph);
       sum += s;
@@ -271,11 +287,7 @@ function bestComb(o: Float32Array, bpmLo: number, bpmHi: number, bpmStep: number
   return best;
 }
 
-export function estimateTempo(
-  oe: OnsetEnvelope,
-  onsets: Seconds[] = [],
-  opts: { minBpm?: number; maxBpm?: number } = {},
-): TempoEstimate | null {
+export function estimateTempo(oe: OnsetEnvelope, onsets: Seconds[] = [], opts: { minBpm?: number; maxBpm?: number } = {}): TempoEstimate | null {
   const { env, hopSec, frameSec } = oe;
   const n = env.length;
   const minBpm = opts.minBpm ?? 70;
@@ -294,10 +306,12 @@ export function estimateTempo(
   if (ac[0] <= 0) return null;
   const at = (L: number) => {
     if (L >= maxLag) return 0;
-    const i = Math.floor(L), f = L - i;
+    const i = Math.floor(L),
+      f = L - i;
     return (ac[i] * (1 - f) + ac[i + 1] * f) / ac[0];
   };
-  let b0 = 0, bestSal = -1;
+  let b0 = 0,
+    bestSal = -1;
   for (let b = minBpm; b <= maxBpm; b += 0.25) {
     const L = 60 / (b * hopSec);
     const prior = Math.exp(-0.5 * (Math.log2(b / 115) / 0.55) ** 2);
@@ -357,7 +371,8 @@ export function refineDownbeat(t: TempoEstimate, chroma: Chroma, duration: Secon
   const beats = Math.floor((duration - t.phase) / P);
   if (beats < 16 || chroma.nFrames < 8) return t;
   const beatVector = (j: number): Float64Array | null => {
-    const a = t.phase + j * P, b = a + P;
+    const a = t.phase + j * P,
+      b = a + P;
     const acc = new Float64Array(12);
     let used = 0;
     for (let f = Math.max(0, Math.floor((a - chroma.frameSec / 2) / chroma.hopSec)); f < chroma.nFrames; f++) {
@@ -372,12 +387,15 @@ export function refineDownbeat(t: TempoEstimate, chroma: Chroma, duration: Secon
     }
     return used ? acc : null;
   };
-  const change = new Float64Array(4), count = new Int32Array(4);
+  const change = new Float64Array(4),
+    count = new Int32Array(4);
   let prev = beatVector(0);
   for (let j = 1; j < beats; j++) {
     const cur = beatVector(j);
     if (prev && cur) {
-      let dot = 0, np = 0, nc = 0;
+      let dot = 0,
+        np = 0,
+        nc = 0;
       for (let i = 0; i < 12; i++) {
         dot += prev[i] * cur[i];
         np += prev[i] * prev[i];
@@ -438,7 +456,9 @@ function yin(x: Float32Array, W: number, tauMin: number, tauMax: number, thresho
     }
   }
   if (tau < 0) return null;
-  const a = cm[tau - 1], b = cm[tau], c = cm[tau + 1];
+  const a = cm[tau - 1],
+    b = cm[tau],
+    c = cm[tau + 1];
   const den = a - 2 * b + c;
   const shift = den !== 0 ? (0.5 * (a - c)) / den : 0;
   return { tau: tau + Math.max(-1, Math.min(1, shift)), clarity: 1 - b };
@@ -452,7 +472,8 @@ export function detectNote(channels: Float32Array[], sampleRate: number, from: S
   const dec = Math.max(1, Math.floor(sampleRate / 6000));
   const M = Math.floor((b - a) / dec);
   const sr = sampleRate / dec;
-  const fmin = 45, fmax = 1500;
+  const fmin = 45,
+    fmax = 1500;
   const tauMax = Math.ceil(sr / fmin);
   const tauMin = Math.floor(sr / fmax);
   const W = 1024;
@@ -533,9 +554,11 @@ export async function computeChroma(
   const data = new Float32Array(nFrames * 12);
   const energy = new Float32Array(nFrames);
   const { hann } = plan(frame);
-  const re = new Float64Array(frame), im = new Float64Array(frame);
+  const re = new Float64Array(frame),
+    im = new Float64Array(frame);
   const binHz = sampleRate / frame;
-  const kMin = Math.max(2, Math.floor(65 / binHz)), kMax = Math.min(frame / 2 - 2, Math.floor(4500 / binHz));
+  const kMin = Math.max(2, Math.floor(65 / binHz)),
+    kMax = Math.min(frame / 2 - 2, Math.floor(4500 / binHz));
   const mag = new Float64Array(kMax + 2);
   const pace = pacer(opts.signal);
   for (let f = 0; f < nFrames; f++) {
@@ -674,7 +697,8 @@ export function detectChords(chroma: Chroma, grid: { bpm: number; offset: Second
     cnt[u]++;
   }
   const S = TEMPLATES.length + 1; // + "no chord"
-  const ALPHA = 8, SWITCH = 2.2;
+  const ALPHA = 8,
+    SWITCH = 2.2;
   const emit = new Float64Array(nUnits * S);
   for (let u = 0; u < nUnits; u++) {
     if (!cnt[u]) {
@@ -686,14 +710,16 @@ export function detectChords(chroma: Chroma, grid: { bpm: number; offset: Second
     for (let s = 0; s < TEMPLATES.length; s++) emit[u * S + s] = ALPHA * sims[s];
     emit[u * S + TEMPLATES.length] = ALPHA * 0.5;
   }
-  const score = new Float64Array(S), next = new Float64Array(S);
+  const score = new Float64Array(S),
+    next = new Float64Array(S);
   const back = new Uint8Array(nUnits * S);
   for (let s = 0; s < S; s++) score[s] = emit[s];
   for (let u = 1; u < nUnits; u++) {
     let bi = 0;
     for (let s = 1; s < S; s++) if (score[s] > score[bi]) bi = s;
     for (let s = 0; s < S; s++) {
-      const stay = score[s], move = score[bi] - SWITCH;
+      const stay = score[s],
+        move = score[bi] - SWITCH;
       if (stay >= move) {
         next[s] = stay + emit[u * S + s];
         back[u * S + s] = s;
@@ -757,9 +783,12 @@ export function detectKey(chroma: Chroma): KeyEstimate | null {
   if (mean <= 0) return null;
   const corr = (profile: number[], rot: number) => {
     const pm = profile.reduce((s, v) => s + v, 0) / 12;
-    let num = 0, da = 0, db = 0;
+    let num = 0,
+      da = 0,
+      db = 0;
     for (let i = 0; i < 12; i++) {
-      const x = acc[(i + rot) % 12] - mean, y = profile[i] - pm;
+      const x = acc[(i + rot) % 12] - mean,
+        y = profile[i] - pm;
       num += x * y;
       da += x * x;
       db += y * y;

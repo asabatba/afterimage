@@ -9,6 +9,7 @@ npm install
 npm run dev            # http://localhost:5173
 npm test               # unit tests (Vitest)
 npm run test:e2e       # browser tests incl. the four build gates (Playwright, Chromium)
+npm run check          # Biome: format + lint + import order (check:fix applies fixes; lint / format run one half)
 npm run build          # production build → dist/
 npm run build:single   # one self-contained HTML file → dist-single/index.html (works from file://)
 ```

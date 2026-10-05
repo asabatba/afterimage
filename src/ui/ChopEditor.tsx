@@ -1,18 +1,18 @@
 // Sample chopper: a zoomable waveform of one pool sample with a beat grid, detected hits and chords,
 // for pulling regions and slices out of a long recording and placing them on the arrangement.
-import { For, Show, createEffect, createMemo, createSignal, on, onCleanup, onMount } from 'solid-js';
-import { chordForRange, detectNote, pickOnsets, refineOnsets, type ChordGuess, type NoteEstimate } from '../model/analysis';
-import { beatAt, beatSeconds, gridLines, nearestOnset, sliceBoundaries, snapToGrid, timeOfBeat, type SliceMode } from '../model/grid';
+import { createEffect, createMemo, createSignal, For, on, onCleanup, onMount, Show } from 'solid-js';
+import { channelsOf } from '../audio/samples';
+import { type ChordGuess, chordForRange, detectNote, type NoteEstimate, pickOnsets, refineOnsets } from '../model/analysis';
+import { beatAt, beatSeconds, gridLines, nearestOnset, type SliceMode, sliceBoundaries, snapToGrid, timeOfBeat } from '../model/grid';
 import { peakSpan } from '../model/peaks';
 import { formatTime } from '../model/timing';
 import { noteName } from '../model/tracker';
-import { audio, project, samples, samplesVersion, toast } from '../store/app';
+import { instrumentFromRegion, placeRegion, setBpm, setSampleGrid, sliceToTrack } from '../store/actions';
 import { analyseSample, analysisOf, analysisProgress, useDetectedGrid } from '../store/analysis';
-import { instrumentFromRegion, placeRegion, setSampleGrid, setBpm, sliceToTrack } from '../store/actions';
-import { channelsOf } from '../audio/samples';
-import { NumberField, Segmented, Slider, Toggle, bindEdit, fmtSigned } from './controls';
-import { TRACK_COLORS, drawSampleWave, setupCanvas } from './draw';
+import { audio, project, samples, samplesVersion, toast } from '../store/app';
+import { bindEdit, fmtSigned, NumberField, Segmented, Slider, Toggle } from './controls';
 import { SLICE_MIME, type SliceDrag } from './dnd';
+import { drawSampleWave, setupCanvas, TRACK_COLORS } from './draw';
 
 const H = 132;
 const OVERVIEW_H = 28;
@@ -75,7 +75,7 @@ export function ChopEditor(props: { sampleId: string }) {
     const s = Math.max(minSpp(), Math.min(fitSpp(), spp() * factor));
     setView(t - anchorX * s, s);
   }
-  const fit = () => setView(0, fitSpp());
+  const showAll = () => setView(0, fitSpp());
   function zoomTo(a: number, b: number) {
     const pad = (b - a) * 0.08;
     const s = (b - a + 2 * pad) / Math.max(1, w());
@@ -126,7 +126,7 @@ export function ChopEditor(props: { sampleId: string }) {
       setView(saved.start, saved.spp);
       setSel(saved.sel);
       setCursor(saved.cursor);
-    } else fit();
+    } else showAll();
     if (!analysis()) void analyseSample(id);
     onCleanup(() => {
       ro.disconnect();
@@ -136,7 +136,7 @@ export function ChopEditor(props: { sampleId: string }) {
   });
 
   // Keep the whole-sample view fitted while the panel is resized and nothing was zoomed in.
-  createEffect(on(w, () => (fitted ? fit() : setView(start(), spp()))));
+  createEffect(on(w, () => (fitted ? showAll() : setView(start(), spp()))));
 
   createEffect(() => {
     const l = loaded();
@@ -146,7 +146,8 @@ export function ChopEditor(props: { sampleId: string }) {
     const { from } = view();
     const perPx = spp();
     const rate = l.buffer.sampleRate;
-    const mid = H / 2, amp = H / 2 - 3;
+    const mid = H / 2,
+      amp = H / 2 - 3;
     g.fillStyle = TRACK_COLORS.amber.wave;
     const framesPerPx = perPx * rate;
     if (framesPerPx >= 48) {
@@ -161,9 +162,11 @@ export function ChopEditor(props: { sampleId: string }) {
       const total = l.buffer.length;
       if (framesPerPx >= 1) {
         for (let x = 0; x < W; x++) {
-          const f0 = Math.floor((from + x * perPx) * rate), f1 = Math.min(total - 1, Math.max(f0, Math.floor((from + (x + 1) * perPx) * rate)));
+          const f0 = Math.floor((from + x * perPx) * rate),
+            f1 = Math.min(total - 1, Math.max(f0, Math.floor((from + (x + 1) * perPx) * rate)));
           if (f0 >= total) break;
-          let lo = Infinity, hi = -Infinity;
+          let lo = Infinity,
+            hi = -Infinity;
           for (let f = Math.max(0, f0); f <= f1; f++) {
             for (const c of chs) {
               if (c[f] < lo) lo = c[f];
@@ -177,7 +180,8 @@ export function ChopEditor(props: { sampleId: string }) {
         g.strokeStyle = TRACK_COLORS.amber.wave;
         g.lineWidth = 1.25;
         g.beginPath();
-        const f0 = Math.max(0, Math.floor(from * rate) - 1), f1 = Math.min(total - 1, Math.ceil((from + W * perPx) * rate) + 1);
+        const f0 = Math.max(0, Math.floor(from * rate) - 1),
+          f1 = Math.min(total - 1, Math.ceil((from + W * perPx) * rate) + 1);
         for (let f = f0; f <= f1; f++) {
           let s = 0;
           for (const c of chs) s += c[f];
@@ -214,7 +218,8 @@ export function ChopEditor(props: { sampleId: string }) {
     if (showHits()) {
       const hits = onsets();
       g.fillStyle = 'rgba(114,144,171,0.9)';
-      let lo = 0, hi = hits.length;
+      let lo = 0,
+        hi = hits.length;
       while (lo < hi) {
         const m = (lo + hi) >> 1;
         if (hits[m] < from) lo = m + 1;
@@ -323,9 +328,11 @@ export function ChopEditor(props: { sampleId: string }) {
     const a = from ?? r?.a ?? cursor() ?? start();
     const b = to ?? r?.b ?? dur();
     cancelAnimationFrame(raf);
-    void audio().engine.auditionSample(id, a, b, loopPreview()).then(() => {
-      raf = requestAnimationFrame(tickPos);
-    });
+    void audio()
+      .engine.auditionSample(id, a, b, loopPreview())
+      .then(() => {
+        raf = requestAnimationFrame(tickPos);
+      });
   }
   const togglePreview = () => (audio().engine.auditionPosition(id) !== null ? stopPreview() : startPreview());
   createEffect(on(loopPreview, () => audio().engine.auditionPosition(id) !== null && startPreview()));
@@ -394,7 +401,7 @@ export function ChopEditor(props: { sampleId: string }) {
         break;
       case 'f':
       case '0':
-        fit();
+        showAll();
         break;
       case 'z': {
         const r = sel();
@@ -445,7 +452,7 @@ export function ChopEditor(props: { sampleId: string }) {
   const selBeats = () => {
     const g = grid();
     const r = region();
-    return g ? ((r.b - r.a) / beatSeconds(g)) : null;
+    return g ? (r.b - r.a) / beatSeconds(g) : null;
   };
   const posLabel = (t: number) => {
     const g = grid();
@@ -471,14 +478,26 @@ export function ChopEditor(props: { sampleId: string }) {
         </div>
 
         <div class="chop-toolbar" role="toolbar" aria-label="Sample editor tools">
-          <button type="button" class="ghost small" aria-pressed={playPos() !== null} onClick={togglePreview} title="Preview the selection, or from the cursor (Space)">
+          <button
+            type="button"
+            class="ghost small"
+            aria-pressed={playPos() !== null}
+            onClick={togglePreview}
+            title="Preview the selection, or from the cursor (Space)"
+          >
             {playPos() !== null ? '■ Stop' : '▶ Play'}
           </button>
           <Toggle label="Loop" on={loopPreview()} onChange={setLoopPreview} title="Repeat the previewed selection (L)" />
           <span class="chop-sep" />
-          <button type="button" class="ghost small" onClick={() => zoomAt(1.5)} title="Zoom out (−)" aria-label="Zoom out">−</button>
-          <button type="button" class="ghost small" onClick={() => zoomAt(1 / 1.5)} title="Zoom in (+, or Ctrl+wheel)" aria-label="Zoom in">+</button>
-          <button type="button" class="ghost small" onClick={fit} title="Show the whole sample (F)">Fit</button>
+          <button type="button" class="ghost small" onClick={() => zoomAt(1.5)} title="Zoom out (−)" aria-label="Zoom out">
+            −
+          </button>
+          <button type="button" class="ghost small" onClick={() => zoomAt(1 / 1.5)} title="Zoom in (+, or Ctrl+wheel)" aria-label="Zoom in">
+            +
+          </button>
+          <button type="button" class="ghost small" onClick={showAll} title="Show the whole sample (F)">
+            Fit
+          </button>
           <button type="button" class="ghost small" disabled={!sel()} onClick={() => sel() && zoomTo(sel()!.a, sel()!.b)} title="Zoom to the selection (Z)">
             Selection
           </button>
@@ -493,7 +512,13 @@ export function ChopEditor(props: { sampleId: string }) {
             ]}
             onChange={setSnap}
           />
-          <select class="tp-select" aria-label="Grid size" value={division()} disabled={snap() !== 'beat'} onChange={(e) => setDivision(parseFloat(e.currentTarget.value))}>
+          <select
+            class="tp-select"
+            aria-label="Grid size"
+            value={division()}
+            disabled={snap() !== 'beat'}
+            onChange={(e) => setDivision(parseFloat(e.currentTarget.value))}
+          >
             <option value={4}>Bar</option>
             <option value={1}>Beat</option>
             <option value={0.5}>½ beat</option>
@@ -560,11 +585,15 @@ export function ChopEditor(props: { sampleId: string }) {
           <span>
             <Show when={sel()} fallback={<>Whole sample</>}>
               Selection <b>{sel()!.a.toFixed(3)}</b>–<b>{sel()!.b.toFixed(3)}</b> s
-            </Show>
-            {' '}· <b>{fmtLen(region().b - region().a)}</b>
+            </Show>{' '}
+            · <b>{fmtLen(region().b - region().a)}</b>
             <Show when={selBeats() !== null}>
-              {' '}· <b>{selBeats()!.toFixed(2)}</b> beats
-              <Show when={selBeats()! >= 3.99}> · <b>{(selBeats()! / 4).toFixed(2)}</b> bars</Show>
+              {' '}
+              · <b>{selBeats()!.toFixed(2)}</b> beats
+              <Show when={selBeats()! >= 3.99}>
+                {' '}
+                · <b>{(selBeats()! / 4).toFixed(2)}</b> bars
+              </Show>
             </Show>
           </span>
           <Show when={cursor() !== null}>
@@ -583,14 +612,28 @@ export function ChopEditor(props: { sampleId: string }) {
           <label class="nf" title="Which track receives the clip">
             <span class="nf-label">Track</span>
             <select aria-label="Target track" onChange={(e) => setTrackSel(e.currentTarget.value)}>
-              <option value="auto" selected={trackSel() === 'auto'}>Auto (first with room)</option>
-              <For each={project.tracks}>{(t) => <option value={t.id} selected={trackSel() === t.id}>{t.name}</option>}</For>
+              <option value="auto" selected={trackSel() === 'auto'}>
+                Auto (first with room)
+              </option>
+              <For each={project.tracks}>
+                {(t) => (
+                  <option value={t.id} selected={trackSel() === t.id}>
+                    {t.name}
+                  </option>
+                )}
+              </For>
             </select>
           </label>
           <label class="nf" title="How to cut the selection, or the whole sample when nothing is selected">
             <span class="nf-label">Slice into</span>
             <select aria-label="Slice size" value={sliceBy()} onChange={(e) => setSliceBy(e.currentTarget.value)}>
-              <For each={SLICE_OPTIONS}>{(o) => <option value={o.value} selected={sliceBy() === o.value}>{o.label}</option>}</For>
+              <For each={SLICE_OPTIONS}>
+                {(o) => (
+                  <option value={o.value} selected={sliceBy() === o.value}>
+                    {o.label}
+                  </option>
+                )}
+              </For>
             </select>
           </label>
           <div class="insp-actions">
@@ -605,7 +648,13 @@ export function ChopEditor(props: { sampleId: string }) {
             </span>
           </div>
           <div class="insp-actions">
-            <button type="button" class="ghost small" disabled={sliceCount() < 1} onClick={slice} title="Cut the selection (or the whole sample) and lay the pieces end to end from the cursor">
+            <button
+              type="button"
+              class="ghost small"
+              disabled={sliceCount() < 1}
+              onClick={slice}
+              title="Cut the selection (or the whole sample) and lay the pieces end to end from the cursor"
+            >
               Slice → timeline{sliceCount() > 0 ? ` (${sliceCount()})` : ''}
             </button>
             <button
@@ -644,12 +693,55 @@ export function ChopEditor(props: { sampleId: string }) {
               </div>
             }
           >
-            <NumberField label="Tempo" value={grid()!.bpm} min={20} max={400} step={0.01} dragPx={1} unit="bpm" format={(v) => v.toFixed(2)} edit={gridEdit('beat grid tempo', (g, v) => (g.bpm = v))} title="Drag, use arrow keys, or double-click to type" />
-            <NumberField label="Beat 1 at" value={grid()!.offset} min={-5} max={dur()} step={0.001} dragPx={1} unit="s" format={(v) => v.toFixed(3)} edit={gridEdit('beat grid offset', (g, v) => (g.offset = v))} title="Where a bar starts, in seconds" />
+            <NumberField
+              label="Tempo"
+              value={grid()!.bpm}
+              min={20}
+              max={400}
+              step={0.01}
+              dragPx={1}
+              unit="bpm"
+              format={(v) => v.toFixed(2)}
+              edit={gridEdit('beat grid tempo', (g, v) => (g.bpm = v))}
+              title="Drag, use arrow keys, or double-click to type"
+            />
+            <NumberField
+              label="Beat 1 at"
+              value={grid()!.offset}
+              min={-5}
+              max={dur()}
+              step={0.001}
+              dragPx={1}
+              unit="s"
+              format={(v) => v.toFixed(3)}
+              edit={gridEdit('beat grid offset', (g, v) => (g.offset = v))}
+              title="Where a bar starts, in seconds"
+            />
             <div class="chop-btns">
-              <button type="button" class="text-btn" onClick={() => setSampleGrid(id, { ...grid()!, bpm: Math.min(400, grid()!.bpm * 2) })} title="Double the tempo">×2</button>
-              <button type="button" class="text-btn" onClick={() => setSampleGrid(id, { ...grid()!, bpm: Math.max(20, grid()!.bpm / 2) })} title="Halve the tempo">÷2</button>
-              <button type="button" class="text-btn" onClick={() => setSampleGrid(id, { ...grid()!, offset: grid()!.offset + beatSeconds(grid()!) })} title="Call the next beat the bar start">Downbeat +1</button>
+              <button
+                type="button"
+                class="text-btn"
+                onClick={() => setSampleGrid(id, { ...grid()!, bpm: Math.min(400, grid()!.bpm * 2) })}
+                title="Double the tempo"
+              >
+                ×2
+              </button>
+              <button
+                type="button"
+                class="text-btn"
+                onClick={() => setSampleGrid(id, { ...grid()!, bpm: Math.max(20, grid()!.bpm / 2) })}
+                title="Halve the tempo"
+              >
+                ÷2
+              </button>
+              <button
+                type="button"
+                class="text-btn"
+                onClick={() => setSampleGrid(id, { ...grid()!, offset: grid()!.offset + beatSeconds(grid()!) })}
+                title="Call the next beat the bar start"
+              >
+                Downbeat +1
+              </button>
               <button
                 type="button"
                 class="text-btn"
@@ -662,21 +754,35 @@ export function ChopEditor(props: { sampleId: string }) {
               >
                 Beat 1 ← cursor
               </button>
-              <button type="button" class="text-btn" onClick={() => setBpm(grid()!.bpm)} title="Set the project tempo to this tempo">Use as project tempo</button>
+              <button type="button" class="text-btn" onClick={() => setBpm(grid()!.bpm)} title="Set the project tempo to this tempo">
+                Use as project tempo
+              </button>
               <Show when={analysis()?.tempo}>
-                <button type="button" class="text-btn" onClick={() => useDetectedGrid(id)} title="Back to the detected grid">Reset</button>
+                <button type="button" class="text-btn" onClick={() => useDetectedGrid(id)} title="Back to the detected grid">
+                  Reset
+                </button>
               </Show>
-              <button type="button" class="text-btn" onClick={() => setSampleGrid(id, undefined, 'clear beat grid')} title="Remove the grid">Clear</button>
+              <button type="button" class="text-btn" onClick={() => setSampleGrid(id, undefined, 'clear beat grid')} title="Remove the grid">
+                Clear
+              </button>
             </div>
             <Show when={Math.abs(grid()!.bpm - project.bpm) > 0.01}>
               <span class="chop-note">
-                Project is at {Number.isInteger(project.bpm) ? project.bpm : project.bpm.toFixed(1)} bpm, so clips from this sample play ×{(project.bpm / grid()!.bpm).toFixed(2)} to stay in time.
+                Project is at {Number.isInteger(project.bpm) ? project.bpm : project.bpm.toFixed(1)} bpm, so clips from this sample play ×
+                {(project.bpm / grid()!.bpm).toFixed(2)} to stay in time.
               </span>
             </Show>
           </Show>
           <Show when={progress()}>
             {(p) => (
-              <div class="chop-progress" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(p().fraction * 100)} aria-label={p().stage}>
+              <div
+                class="chop-progress"
+                role="progressbar"
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={Math.round(p().fraction * 100)}
+                aria-label={p().stage}
+              >
                 <div style={{ width: `${Math.round(p().fraction * 100)}%` }} />
                 <span>{p().stage}…</span>
               </div>
@@ -718,7 +824,6 @@ export function ChopEditor(props: { sampleId: string }) {
             </div>
           </Show>
         </fieldset>
-
       </div>
     </div>
   );

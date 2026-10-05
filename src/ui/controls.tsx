@@ -1,5 +1,5 @@
 // Small, keyboard-accessible controls bound to undoable project edits.
-import { For, Show, createSignal, onCleanup, type JSX } from 'solid-js';
+import { createSignal, For, type JSX, onCleanup, Show } from 'solid-js';
 import type { Project } from '../model/types';
 import { beginGesture, commit, endGesture, live } from '../store/app';
 
@@ -56,7 +56,9 @@ export function NumberField(props: NumberFieldProps) {
     const s = step();
     return clamp(Math.round(v / s) * s, props.min, props.max);
   };
-  let startY = 0, startV = 0, moved = false;
+  let startY = 0,
+    startV = 0,
+    moved = false;
 
   const onPointerDown = (e: PointerEvent) => {
     if (props.disabled || editing() || e.button !== 0) return;
@@ -205,7 +207,15 @@ export function Slider(props: SliderProps) {
   );
 }
 
-export function Toggle(props: { label: string; on: boolean; onChange: (v: boolean) => void; title?: string; class?: string; children?: JSX.Element; disabled?: boolean }) {
+export function Toggle(props: {
+  label: string;
+  on: boolean;
+  onChange: (v: boolean) => void;
+  title?: string;
+  class?: string;
+  children?: JSX.Element;
+  disabled?: boolean;
+}) {
   return (
     <button
       type="button"
@@ -220,7 +230,13 @@ export function Toggle(props: { label: string; on: boolean; onChange: (v: boolea
   );
 }
 
-export function Segmented<T extends string>(props: { label: string; value: T; options: { value: T; label: string; title?: string }[]; onChange: (v: T) => void; disabled?: boolean }) {
+export function Segmented<T extends string>(props: {
+  label: string;
+  value: T;
+  options: { value: T; label: string; title?: string }[];
+  onChange: (v: T) => void;
+  disabled?: boolean;
+}) {
   return (
     <div class="segmented" role="radiogroup" aria-label={props.label}>
       <For each={props.options}>

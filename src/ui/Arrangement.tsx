@@ -1,18 +1,7 @@
-import { For, Show, createMemo, createSignal, onCleanup, onMount } from 'solid-js';
-import type { Track } from '../model/types';
-import { BEATS_PER_BAR, snapBeat } from '../model/timing';
+import { createMemo, createSignal, For, onCleanup, onMount, Show } from 'solid-js';
 import { songEnd } from '../model/clips';
-import {
-  beginGesture,
-  endGesture,
-  live,
-  playhead,
-  playing,
-  project,
-  selectClips,
-  setUi,
-  ui,
-} from '../store/app';
+import { BEATS_PER_BAR, snapBeat } from '../model/timing';
+import type { Track } from '../model/types';
 import {
   addClipFromSample,
   addMarker,
@@ -27,9 +16,10 @@ import {
   updateMarker,
   updateTrack,
 } from '../store/actions';
+import { beginGesture, endGesture, live, playhead, playing, project, selectClips, setUi, ui } from '../store/app';
 import { ClipView } from './ClipView';
-import { TRACK_COLORS } from './draw';
 import { SAMPLE_MIME, SLICE_MIME, type SliceDrag } from './dnd';
+import { TRACK_COLORS } from './draw';
 import { meters } from './meters';
 
 export { SAMPLE_MIME };
@@ -52,7 +42,9 @@ export function Arrangement() {
   const view = { scrollLeft, viewW };
 
   const headerW = 188;
-  const totalBeats = createMemo(() => Math.max(songEnd(project.clips) + 16 * BEATS_PER_BAR, project.loop.end + 8, (viewW() / ui.pxPerBeat) * 1.2, 64 * BEATS_PER_BAR));
+  const totalBeats = createMemo(() =>
+    Math.max(songEnd(project.clips) + 16 * BEATS_PER_BAR, project.loop.end + 8, (viewW() / ui.pxPerBeat) * 1.2, 64 * BEATS_PER_BAR),
+  );
   const timelineW = () => totalBeats() * ui.pxPerBeat;
 
   onMount(() => {
@@ -175,7 +167,8 @@ export function Arrangement() {
           p.loop.start = Math.max(0, start + d);
           p.loop.end = p.loop.start + (end - start);
         } else {
-          const a = sn(Math.min(b, b0)), z = sn(Math.max(b, b0));
+          const a = sn(Math.min(b, b0)),
+            z = sn(Math.max(b, b0));
           if (z - a >= ui.grid) {
             p.loop.start = a;
             p.loop.end = z;
@@ -263,11 +256,7 @@ export function Arrangement() {
             </button>
           </div>
           <div class="ruler" style={{ width: `${timelineW()}px` }}>
-            <div
-              class="ruler-sections"
-              onDblClick={(e) => addMarker(beatAtClientX(e.clientX))}
-              title="Double-click to add a section marker"
-            >
+            <div class="ruler-sections" onDblClick={(e) => addMarker(beatAtClientX(e.clientX))} title="Double-click to add a section marker">
               <For each={project.markers}>
                 {(m) => (
                   <div class="marker" style={{ left: `${m.beat * ui.pxPerBeat}px` }} onPointerDown={(e) => onMarkerDown(e, m.id, m.beat)}>
@@ -364,7 +353,9 @@ export function Arrangement() {
           <Show when={project.clips.length === 0}>
             <div class="arr-empty" style={{ left: `${headerW + 24}px` }}>
               <p class="arr-empty-title">Start with a sound.</p>
-              <p>Drop audio files on a track, drag a sample from the pool, or record one from the capture panel. Double-click a lane to start a tracker pattern.</p>
+              <p>
+                Drop audio files on a track, drag a sample from the pool, or record one from the capture panel. Double-click a lane to start a tracker pattern.
+              </p>
             </div>
           </Show>
           <Show when={project.loop.enabled}>
@@ -451,4 +442,3 @@ function TrackHeader(props: { track: Track }) {
     </div>
   );
 }
-

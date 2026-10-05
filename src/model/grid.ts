@@ -37,7 +37,8 @@ export function gridLines(g: BeatGrid, from: Seconds, to: Seconds, division = 1)
 
 /** Nearest onset to `t` within `tol` seconds. */
 export function nearestOnset(onsets: Seconds[], t: Seconds, tol: Seconds): Seconds | null {
-  let lo = 0, hi = onsets.length;
+  let lo = 0,
+    hi = onsets.length;
   while (lo < hi) {
     const mid = (lo + hi) >> 1;
     if (onsets[mid] < t) lo = mid + 1;

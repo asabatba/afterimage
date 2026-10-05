@@ -1,15 +1,15 @@
 // Application state: the project (Solid store), UI state, undo history and
 // the audio singletons. Decoded audio stays in the SampleRegistry.
-import { createSignal, batch } from 'solid-js';
+import { batch, createSignal } from 'solid-js';
 import { createStore, produce, reconcile, unwrap } from 'solid-js/store';
-import type { Project } from '../model/types';
-import { createProject } from '../model/project';
-import { History } from '../model/history';
-import { normalizeClip } from '../model/timing';
-import { checkOverlaps } from '../model/clips';
+import { CaptureManager } from '../audio/capture';
 import { AudioEngine } from '../audio/engine';
 import { SampleRegistry } from '../audio/samples';
-import { CaptureManager } from '../audio/capture';
+import { checkOverlaps } from '../model/clips';
+import { History } from '../model/history';
+import { createProject } from '../model/project';
+import { normalizeClip } from '../model/timing';
+import type { Project } from '../model/types';
 
 // ── Project ──────────────────────────────────────────────────────────────
 
@@ -19,11 +19,7 @@ export const rawProject = () => unwrap(project);
 
 // ── UI state ─────────────────────────────────────────────────────────────
 
-export type Selection =
-  | { kind: 'none' }
-  | { kind: 'clips'; ids: string[] }
-  | { kind: 'instrument'; id: string }
-  | { kind: 'sample'; id: string };
+export type Selection = { kind: 'none' } | { kind: 'clips'; ids: string[] } | { kind: 'instrument'; id: string } | { kind: 'sample'; id: string };
 
 export type RepeatStep = 'auto' | 'bar' | 'bars2' | 'bars4';
 export type FillTarget = 'loop' | 'section' | 'song' | 'bars8' | 'bars16' | 'bars32';
@@ -117,7 +113,9 @@ export interface Toast {
   text: string;
 }
 const [toasts, setToasts] = createSignal<Toast[]>([]);
+
 export { toasts };
+
 let toastId = 0;
 export function toast(text: string, kind: Toast['kind'] = 'info', ms = kind === 'error' ? 9000 : 3500) {
   const id = ++toastId;
@@ -162,10 +160,12 @@ let gestureBefore: Project | null = null;
  */
 export function commit(label: string, fn: (p: Project) => void, opts: { checkOverlaps?: boolean; quiet?: boolean } = {}): boolean {
   const before = gestureBefore ?? snapshot();
-  setProject(produce((p) => {
-    fn(p);
-    p.updatedAt = Date.now();
-  }));
+  setProject(
+    produce((p) => {
+      fn(p);
+      p.updatedAt = Date.now();
+    }),
+  );
   if (opts.checkOverlaps !== false) {
     const problem = checkOverlaps(project.clips);
     if (problem) {

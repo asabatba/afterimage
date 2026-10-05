@@ -61,7 +61,8 @@ function tones(notes: { midi: number[]; from: number; to: number }[], seconds: n
 describe('fft', () => {
   it('puts a sine in the right bin', () => {
     const n = 1024;
-    const re = new Float64Array(n), im = new Float64Array(n);
+    const re = new Float64Array(n),
+      im = new Float64Array(n);
     for (let i = 0; i < n; i++) re[i] = Math.sin((2 * Math.PI * 50 * i) / n);
     fft(re, im);
     let best = 0;
@@ -90,7 +91,11 @@ describe('onsets', () => {
 });
 
 describe('tempo', () => {
-  for (const [bpm, offset] of [[120, 0.23], [96, 0.4], [128, 0.05]] as const) {
+  for (const [bpm, offset] of [
+    [120, 0.23],
+    [96, 0.4],
+    [128, 0.05],
+  ] as const) {
     it(`detects ${bpm} bpm and the beat phase`, async () => {
       const x = drumLoop(bpm, offset, 24);
       const oe = await onsetEnvelope([x], SR);
@@ -99,7 +104,7 @@ describe('tempo', () => {
       expect(t).not.toBeNull();
       expect(Math.abs(t.bpm - bpm)).toBeLessThan(0.3);
       const P = 60 / bpm;
-      const err = (((t.offset - offset) % P) + P + P / 2) % P - P / 2;
+      const err = ((((t.offset - offset) % P) + P + P / 2) % P) - P / 2;
       expect(Math.abs(err)).toBeLessThan(0.015);
       expect(t.confidence).toBeGreaterThan(0.3);
     });
@@ -117,7 +122,12 @@ describe('downbeat', () => {
     const beat = 60 / bpm;
     const secs = offset + bars * 4 * beat + 0.5;
     const x = drumLoop(bpm, offset, secs);
-    const chords = [[60, 64, 67], [53, 57, 60], [57, 60, 64], [55, 59, 62]];
+    const chords = [
+      [60, 64, 67],
+      [53, 57, 60],
+      [57, 60, 64],
+      [55, 59, 62],
+    ];
     for (let bar = 0; bar < bars; bar++) {
       const t0 = offset + bar * 4 * beat;
       for (const m of chords[Math.floor(bar / 2) % 4]) {
@@ -140,7 +150,10 @@ describe('downbeat', () => {
     expect(a.tempo!.offset).toBeCloseTo(rough.offset, 6);
   });
 
-  for (const [bpm, offset] of [[112, 0.37], [100, 0.3]] as const) {
+  for (const [bpm, offset] of [
+    [112, 0.37],
+    [100, 0.3],
+  ] as const) {
     it(`puts the bar start on the chord change at ${bpm} bpm`, async () => {
       const bars = 16;
       const a = await analyzeSample([band(bpm, offset, bars)], SR);
@@ -178,7 +191,10 @@ describe('pitch', () => {
 });
 
 describe('chords and key', () => {
-  const C = [60, 64, 67], F = [53, 57, 60], Am = [57, 60, 64], G = [55, 59, 62];
+  const C = [60, 64, 67],
+    F = [53, 57, 60],
+    Am = [57, 60, 64],
+    G = [55, 59, 62];
   const song = () =>
     tones(
       [

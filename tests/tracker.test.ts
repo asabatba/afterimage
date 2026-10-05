@@ -1,19 +1,19 @@
 import { describe, expect, it } from 'vitest';
+import { createPatternClip } from '../src/model/project';
 import {
   clipEventsInRange,
+  clonePattern,
   copyBlock,
   createPattern,
   keyToNote,
   noteName,
   pasteBlock,
   patternEvents,
+  resizePattern,
   rowTime,
   setCell,
   transposeBlock,
-  resizePattern,
-  clonePattern,
 } from '../src/model/tracker';
-import { createPatternClip } from '../src/model/project';
 import { NOTE_OFF } from '../src/model/types';
 
 describe('tracker', () => {

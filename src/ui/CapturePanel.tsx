@@ -1,10 +1,10 @@
-import { For, Show, createResource, createSignal } from 'solid-js';
-import { BEATS_PER_BAR, formatBBT } from '../model/timing';
-import { audio, project, setUi, toast, ui } from '../store/app';
-import { startCapture } from '../store/actions';
+import { createResource, createSignal, For, Show } from 'solid-js';
 import { CaptureManager } from '../audio/capture';
-import { Meter, NumberField, Segmented, Toggle } from './controls';
+import { BEATS_PER_BAR, formatBBT } from '../model/timing';
+import { startCapture } from '../store/actions';
+import { audio, project, setUi, toast, ui } from '../store/app';
 import { captureStatus, elapsed, inputInfo, inputLevels, monitoring } from './captureState';
+import { Meter, NumberField, Segmented, Toggle } from './controls';
 
 export function CapturePanel() {
   const c = () => ui.capture;
@@ -30,7 +30,8 @@ export function CapturePanel() {
 
   const range = () => {
     if (c().length === 'loop') return `${formatBBT(project.loop.start)} → ${formatBBT(project.loop.end)} (loop range)`;
-    if (c().length === 'bars') return `${c().bars} bar${c().bars > 1 ? 's' : ''} from ${formatBBT(ui.snap ? Math.round(ui.cursor / BEATS_PER_BAR) * BEATS_PER_BAR : ui.cursor)}`;
+    if (c().length === 'bars')
+      return `${c().bars} bar${c().bars > 1 ? 's' : ''} from ${formatBBT(ui.snap ? Math.round(ui.cursor / BEATS_PER_BAR) * BEATS_PER_BAR : ui.cursor)}`;
     return `From ${formatBBT(ui.cursor)} until you stop`;
   };
 
@@ -128,7 +129,12 @@ export function CapturePanel() {
       <div class="cap-section">
         <label class="field">
           <span class="nf-label">Destination</span>
-          <select aria-label="Destination" value={c().destTrackId ?? ''} disabled={busy()} onChange={(e) => setUi('capture', 'destTrackId', e.currentTarget.value)}>
+          <select
+            aria-label="Destination"
+            value={c().destTrackId ?? ''}
+            disabled={busy()}
+            onChange={(e) => setUi('capture', 'destTrackId', e.currentTarget.value)}
+          >
             <For each={project.tracks}>{(t) => <option value={t.id}>{t.name}</option>}</For>
           </select>
         </label>
@@ -146,9 +152,26 @@ export function CapturePanel() {
         />
         <div class="cap-row">
           <Show when={c().length === 'bars'}>
-            <NumberField label="Bars" value={c().bars} min={1} max={64} step={1} dragPx={8} edit={{ begin() {}, end() {}, change: (v) => setUi('capture', 'bars', v) }} />
+            <NumberField
+              label="Bars"
+              value={c().bars}
+              min={1}
+              max={64}
+              step={1}
+              dragPx={8}
+              edit={{ begin() {}, end() {}, change: (v) => setUi('capture', 'bars', v) }}
+            />
           </Show>
-          <NumberField label="Count-in" value={c().countInBars} min={0} max={4} step={1} dragPx={12} unit={c().countInBars === 1 ? 'bar' : 'bars'} edit={{ begin() {}, end() {}, change: (v) => setUi('capture', 'countInBars', v) }} />
+          <NumberField
+            label="Count-in"
+            value={c().countInBars}
+            min={0}
+            max={4}
+            step={1}
+            dragPx={12}
+            unit={c().countInBars === 1 ? 'bar' : 'bars'}
+            edit={{ begin() {}, end() {}, change: (v) => setUi('capture', 'countInBars', v) }}
+          />
         </div>
         <p class="cap-note">{range()}</p>
         <div class="cap-row">
@@ -190,9 +213,20 @@ export function CapturePanel() {
         </Show>
       </div>
       <p class="cap-status" role="status">
-        <Show when={busy()} fallback={<span>{isInput() ? 'Recordings become new samples and clips on the destination track.' : 'Prints become new samples; source clips stay as they are.'}</span>}>
+        <Show
+          when={busy()}
+          fallback={
+            <span>
+              {isInput() ? 'Recordings become new samples and clips on the destination track.' : 'Prints become new samples; source clips stay as they are.'}
+            </span>
+          }
+        >
           <span class="cap-live">
-            {captureStatus() === 'count-in' ? 'Counting in…' : captureStatus() === 'finishing' ? 'Finishing the take…' : `${verb() === 'Record' ? 'Recording' : 'Printing'} ${elapsed().toFixed(1)} s`}
+            {captureStatus() === 'count-in'
+              ? 'Counting in…'
+              : captureStatus() === 'finishing'
+                ? 'Finishing the take…'
+                : `${verb() === 'Record' ? 'Recording' : 'Printing'} ${elapsed().toFixed(1)} s`}
           </span>
         </Show>
       </p>

@@ -18,34 +18,52 @@ export function encodeWav(channels: Float32Array[], sampleRate: number, format: 
     for (let i = 0; i < s.length; i++) v.setUint8(o++, s.charCodeAt(i));
   };
   str('RIFF');
-  v.setUint32(o, headerSize - 8 + dataBytes, true); o += 4;
+  v.setUint32(o, headerSize - 8 + dataBytes, true);
+  o += 4;
   str('WAVE');
   str('fmt ');
-  v.setUint32(o, fmtSize, true); o += 4;
-  v.setUint16(o, isFloat ? 3 : 1, true); o += 2;
-  v.setUint16(o, nch, true); o += 2;
-  v.setUint32(o, sampleRate, true); o += 4;
-  v.setUint32(o, sampleRate * nch * bytesPer, true); o += 4;
-  v.setUint16(o, nch * bytesPer, true); o += 2;
-  v.setUint16(o, bytesPer * 8, true); o += 2;
+  v.setUint32(o, fmtSize, true);
+  o += 4;
+  v.setUint16(o, isFloat ? 3 : 1, true);
+  o += 2;
+  v.setUint16(o, nch, true);
+  o += 2;
+  v.setUint32(o, sampleRate, true);
+  o += 4;
+  v.setUint32(o, sampleRate * nch * bytesPer, true);
+  o += 4;
+  v.setUint16(o, nch * bytesPer, true);
+  o += 2;
+  v.setUint16(o, bytesPer * 8, true);
+  o += 2;
   if (isFloat) {
-    v.setUint16(o, 0, true); o += 2;
+    v.setUint16(o, 0, true);
+    o += 2;
     str('fact');
-    v.setUint32(o, 4, true); o += 4;
-    v.setUint32(o, frames, true); o += 4;
+    v.setUint32(o, 4, true);
+    o += 4;
+    v.setUint32(o, frames, true);
+    o += 4;
   }
   str('data');
-  v.setUint32(o, dataBytes, true); o += 4;
+  v.setUint32(o, dataBytes, true);
+  o += 4;
 
   if (isFloat) {
-    for (let i = 0; i < frames; i++) for (let c = 0; c < nch; c++) { v.setFloat32(o, channels[c][i], true); o += 4; }
+    for (let i = 0; i < frames; i++)
+      for (let c = 0; c < nch; c++) {
+        v.setFloat32(o, channels[c][i], true);
+        o += 4;
+      }
   } else if (format === 'pcm24') {
     for (let i = 0; i < frames; i++)
       for (let c = 0; c < nch; c++) {
         const s = Math.max(-1, Math.min(1, channels[c][i]));
         let x = Math.round(s < 0 ? s * 0x800000 : s * 0x7fffff);
         if (x < 0) x += 0x1000000;
-        v.setUint8(o, x & 0xff); v.setUint8(o + 1, (x >> 8) & 0xff); v.setUint8(o + 2, (x >> 16) & 0xff);
+        v.setUint8(o, x & 0xff);
+        v.setUint8(o + 1, (x >> 8) & 0xff);
+        v.setUint8(o + 2, (x >> 16) & 0xff);
         o += 3;
       }
   } else {

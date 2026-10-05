@@ -1,8 +1,9 @@
 // Offline render: a fresh engine on an OfflineAudioContext with the same
 // scheduling, DSP and effects as playback. Rendering starts after an internal
 // preroll (so the stretcher can compensate its latency) which is then removed.
-import type { Project } from '../model/types';
+
 import { beatsToSec } from '../model/timing';
+import type { Project } from '../model/types';
 import { AudioEngine } from './engine';
 import type { SampleRegistry } from './samples';
 

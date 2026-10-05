@@ -1,10 +1,10 @@
 // Analysis of pool samples (tempo, beats, hits, chords, key). Results live in memory only: they are
 // cheap to recompute, while the beat grid the user actually relies on is stored on the sample itself.
 import { createSignal } from 'solid-js';
-import { analyzeSample, chordForRange, computeChroma, detectNote, type ChordGuess, type NoteEstimate, type SampleAnalysis } from '../model/analysis';
 import { channelsOf } from '../audio/samples';
-import { project, samples, toast } from './app';
+import { analyzeSample, type ChordGuess, chordForRange, computeChroma, detectNote, type NoteEstimate, type SampleAnalysis } from '../model/analysis';
 import { setSampleGrid } from './actions';
+import { project, samples, toast } from './app';
 
 const cache = new Map<string, SampleAnalysis>();
 const [rev, bump] = createSignal(0);

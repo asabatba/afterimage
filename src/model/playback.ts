@@ -1,11 +1,10 @@
 // Pure planning helpers used by the audio engine (and tested without audio).
-import type { AudioClip, Beats, Clip, Project } from './types';
-import { EPS, clipEnd, clipRate, effectivePitch, fadeGainAt, needsStretch, sourcePosAt, dbToGain } from './timing';
-import { effectiveFades } from './clips';
 
-export type GainStep =
-  | { type: 'set'; at: Beats; value: number }
-  | { type: 'curve'; at: Beats; dur: Beats; values: Float32Array };
+import { effectiveFades } from './clips';
+import { clipEnd, clipRate, dbToGain, EPS, effectivePitch, fadeGainAt, needsStretch, sourcePosAt } from './timing';
+import type { AudioClip, Beats, Clip, Project } from './types';
+
+export type GainStep = { type: 'set'; at: Beats; value: number } | { type: 'curve'; at: Beats; dur: Beats; values: Float32Array };
 
 const CURVE_POINTS = 48;
 

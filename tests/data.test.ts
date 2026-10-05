@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { decodeWav, encodeWav } from '../src/model/wav';
-import { computePeaks, peakSpan } from '../src/model/peaks';
 import { History } from '../src/model/history';
+import { computePeaks, peakSpan } from '../src/model/peaks';
+import { decodeWav, encodeWav } from '../src/model/wav';
 
 describe('wav', () => {
   const sr = 44100;

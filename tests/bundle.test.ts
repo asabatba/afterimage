@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { createBundle, readBundle } from '../src/store/bundle';
 import { createAudioClip, createProject } from '../src/model/project';
+import { createBundle, readBundle } from '../src/store/bundle';
 import { sample } from './helpers';
 
 describe('project bundle', () => {

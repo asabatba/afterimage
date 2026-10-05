@@ -1,8 +1,8 @@
-import { For, Show, createResource, createSignal } from 'solid-js';
+import { createResource, createSignal, For, Show } from 'solid-js';
+import { beatsToSec, formatBBT, formatTime } from '../model/timing';
 import type { WavFormat } from '../model/wav';
-import { formatBBT, beatsToSec, formatTime } from '../model/timing';
-import { dismissToast, project, setProject, setUi, toast, toasts, ui } from '../store/app';
 import { exportWav, sectionRange, songRange } from '../store/actions';
+import { dismissToast, project, setProject, setUi, toast, toasts, ui } from '../store/app';
 import { deleteProjectById, duplicateCurrentProject, listProjects, newProject, openProject } from '../store/session';
 import { NumberField, Segmented } from './controls';
 
@@ -48,7 +48,11 @@ export function ExportDialog() {
       const [a, b] = range();
       const label = which() === 'song' ? '' : which() === 'loop' ? ' (loop)' : ` (${project.markers.find((m) => m.id === which())?.name})`;
       const r = await exportWav([a, b], tail(), format(), `${project.name}${label}`);
-      toast(r.peak > 1 ? `Exported. The mix peaks at +${(20 * Math.log10(r.peak)).toFixed(1)} dBFS — lower the master to avoid clipping.` : 'Exported WAV.', r.peak > 1 ? 'warn' : 'info', 6000);
+      toast(
+        r.peak > 1 ? `Exported. The mix peaks at +${(20 * Math.log10(r.peak)).toFixed(1)} dBFS — lower the master to avoid clipping.` : 'Exported WAV.',
+        r.peak > 1 ? 'warn' : 'info',
+        6000,
+      );
       setUi('exportOpen', false);
     } catch (e: any) {
       toast(`Export failed: ${e?.message ?? e}`, 'error');
@@ -68,9 +72,21 @@ export function ExportDialog() {
           </select>
         </label>
         <p class="cap-note">
-          {formatBBT(range()[0])} → {formatBBT(range()[1])}, {formatTime(beatsToSec(range()[1] - range()[0], project.bpm))} plus {tail().toFixed(1)} s of effects tail.
+          {formatBBT(range()[0])} → {formatBBT(range()[1])}, {formatTime(beatsToSec(range()[1] - range()[0], project.bpm))} plus {tail().toFixed(1)} s of
+          effects tail.
         </p>
-        <NumberField label="Effects tail" value={tail()} min={0} max={30} step={0.5} dragPx={4} unit="s" format={(v) => v.toFixed(1)} edit={{ begin() {}, end() {}, change: setTail }} title="Extra time after the range so delay and reverb can ring out" />
+        <NumberField
+          label="Effects tail"
+          value={tail()}
+          min={0}
+          max={30}
+          step={0.5}
+          dragPx={4}
+          unit="s"
+          format={(v) => v.toFixed(1)}
+          edit={{ begin() {}, end() {}, change: setTail }}
+          title="Extra time after the range so delay and reverb can ring out"
+        />
         <span class="nf-label">Format</span>
         <Segmented
           label="Format"

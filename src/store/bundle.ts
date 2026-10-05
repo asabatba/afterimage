@@ -1,9 +1,9 @@
 // Portable project bundle: a ZIP with the project JSON and every sample as a
 // lossless 32-bit float WAV.
-import { unzipSync, zipSync, strToU8, strFromU8 } from 'fflate';
+import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate';
+import { migrateProject } from '../model/project';
 import type { Project } from '../model/types';
 import { decodeWav, encodeWav } from '../model/wav';
-import { migrateProject } from '../model/project';
 
 export const BUNDLE_EXT = '.afterimage.zip';
 

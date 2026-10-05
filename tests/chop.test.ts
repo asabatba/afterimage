@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { beatAt, gridLines, nearestOnset, sliceBoundaries, snapToGrid, timeOfBeat } from '../src/model/grid';
 import { regionClip, sliceClips } from '../src/model/chop';
 import { checkOverlaps, fillClips, groupSpan, pasteClips, repeatClips } from '../src/model/clips';
+import { beatAt, gridLines, nearestOnset, sliceBoundaries, snapToGrid, timeOfBeat } from '../src/model/grid';
 import { createAudioClip, createPatternClip } from '../src/model/project';
-import { createPattern } from '../src/model/tracker';
 import { clipEnd } from '../src/model/timing';
+import { createPattern } from '../src/model/tracker';
 import type { AudioClip, SampleMeta } from '../src/model/types';
 import { sample } from './helpers';
 
@@ -112,9 +112,15 @@ describe('repeat, fill and paste', () => {
   });
 
   it('repeats a multi-clip group as a unit and honours a step', () => {
-    const a = clip(0, 1, 't1'), b = clip(2, 1, 't2');
+    const a = clip(0, 1, 't1'),
+      b = clip(2, 1, 't2');
     const copies = repeatClips([a, b], 2, 8);
-    expect(copies.map((x) => [x.trackId, x.start])).toEqual([['t1', 8], ['t2', 10], ['t1', 16], ['t2', 18]]);
+    expect(copies.map((x) => [x.trackId, x.start])).toEqual([
+      ['t1', 8],
+      ['t2', 10],
+      ['t1', 16],
+      ['t2', 18],
+    ]);
   });
 
   it('does nothing for a zero step', () => {
@@ -159,9 +165,13 @@ describe('repeat, fill and paste', () => {
 
   it('pastes at a beat, keeping relative positions and shifting rows', () => {
     const tracks = ['t1', 't2', 't3'];
-    const a = clip(4, 1, 't1'), b = clip(6, 1, 't2');
+    const a = clip(4, 1, 't1'),
+      b = clip(6, 1, 't2');
     const out = pasteClips([a, b], 16, tracks, 1);
-    expect(out.map((x) => [x.trackId, x.start])).toEqual([['t2', 16], ['t3', 18]]);
+    expect(out.map((x) => [x.trackId, x.start])).toEqual([
+      ['t2', 16],
+      ['t3', 18],
+    ]);
     const clamped = pasteClips([a, b], 0, tracks, 5);
     expect(clamped.every((x) => x.trackId === 't3')).toBe(true);
     expect(out[0].id).not.toBe(a.id);

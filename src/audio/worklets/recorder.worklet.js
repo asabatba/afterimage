@@ -4,7 +4,7 @@
 class AfterimageRecorder extends AudioWorkletProcessor {
   constructor(options) {
     super();
-    const o = (options && options.processorOptions) || {};
+    const o = options?.processorOptions || {};
     this.channels = o.channels || 2;
     this.chunkFrames = o.chunkFrames || 4096;
     this.pool = [];
@@ -57,7 +57,10 @@ class AfterimageRecorder extends AudioWorkletProcessor {
   flush(final) {
     if (this.current && this.fill > 0 && this.sink) {
       const bufs = this.current;
-      this.sink.postMessage({ type: 'chunk', seq: this.seq++, frames: this.fill, buffers: bufs }, bufs.map((b) => b.buffer));
+      this.sink.postMessage(
+        { type: 'chunk', seq: this.seq++, frames: this.fill, buffers: bufs },
+        bufs.map((b) => b.buffer),
+      );
     } else if (this.current) {
       this.pool.push(this.current);
     }

@@ -37,9 +37,9 @@
   --plate: rgba(237, 230, 214, 0.22);
   --plate-strong: rgba(237, 230, 214, 0.75);
 
-  --sans: 'IBM Plex Sans', system-ui, sans-serif;
-  --mono: 'JetBrains Mono Variable', 'JetBrains Mono', ui-monospace, monospace;
-  --serif: 'Fraunces Variable', 'Fraunces', Georgia, serif;
+  --sans: "IBM Plex Sans", system-ui, sans-serif;
+  --mono: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, monospace;
+  --serif: "Fraunces Variable", "Fraunces", Georgia, serif;
 
   --fs-xs: 11px;
   --fs-s: 12px;

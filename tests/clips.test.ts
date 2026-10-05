@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { createAudioClip, createPatternClip } from '../src/model/project';
 import { checkOverlaps, duplicateClip, effectiveFades, slip, splitClip, stretchTo, trimEnd, trimStart } from '../src/model/clips';
-import { createPattern } from '../src/model/tracker';
+import { gainAutomation, planAudio } from '../src/model/playback';
+import { createAudioClip, createPatternClip } from '../src/model/project';
 import { sourcePosAt } from '../src/model/timing';
-import { planAudio, gainAutomation } from '../src/model/playback';
+import { createPattern } from '../src/model/tracker';
 import type { AudioClip } from '../src/model/types';
 import { sample } from './helpers';
 
@@ -100,17 +100,22 @@ describe('overlaps and crossfades', () => {
   });
 
   it('rejects a third simultaneous layer', () => {
-    const a = clip(0), b = clip(4), c = clip(6);
+    const a = clip(0),
+      b = clip(4),
+      c = clip(6);
     expect(checkOverlaps([a, b, c])?.reason).toBe('too-many-layers');
   });
 
   it('rejects a clip fully inside another', () => {
-    const a = clip(0, 4), b = clip(2, 1);
+    const a = clip(0, 4),
+      b = clip(2, 1);
     expect(checkOverlaps([a, b])?.reason).toBe('contained');
   });
 
   it('ignores clips on different tracks', () => {
-    const a = clip(0), b = { ...clip(2), trackId: 't2' }, c = { ...clip(4), trackId: 't3' };
+    const a = clip(0),
+      b = { ...clip(2), trackId: 't2' },
+      c = { ...clip(4), trackId: 't3' };
     expect(checkOverlaps([a, b, c])).toBeNull();
   });
 });

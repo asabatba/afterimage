@@ -1,10 +1,10 @@
-import { For, Index, Show, createMemo, createSignal, createEffect, on } from 'solid-js';
-import type { Cell, FxCode, Pattern, PatternClip } from '../model/types';
-import { NOTE_OFF } from '../model/types';
+import { createEffect, createMemo, createSignal, For, Index, on, Show } from 'solid-js';
 import {
+  type Block,
+  clearBlock,
+  copyBlock,
   FX_CODES,
   FX_HELP,
-  copyBlock,
   hex2,
   keyToNote,
   normBlock,
@@ -15,12 +15,12 @@ import {
   rowAtBeat,
   setCell,
   transposeBlock,
-  clearBlock,
-  type Block,
 } from '../model/tracker';
-import { audio, playhead, playing, project, setUi, ui } from '../store/app';
+import type { Cell, FxCode, Pattern, PatternClip } from '../model/types';
+import { NOTE_OFF } from '../model/types';
 import { linkedCount, makeUnique, updatePattern } from '../store/actions';
-import { NumberField, bindEdit } from './controls';
+import { audio, playhead, playing, project, setUi, ui } from '../store/app';
+import { bindEdit, NumberField } from './controls';
 
 // Field layout inside a column: note | ins hi, ins lo | vel hi, vel lo | fx | fx hi, fx lo
 const FIELDS = 8;
@@ -84,7 +84,8 @@ export function TrackerEditor(props: { clip: PatternClip }) {
     const note = keyToNote(code, cur().octave);
     if (note === null) return false;
     if (held.has(code)) return true; // key repeat
-    let row = cur().row, col = cur().col;
+    let row = cur().row,
+      col = cur().col;
     if (chord && held.size > 0) {
       chord.n++;
       row = chord.row;
@@ -304,12 +305,65 @@ export function TrackerEditor(props: { clip: PatternClip }) {
                 </button>
               </span>
             </Show>
-            <NumberField label="Rows" value={p().rows} min={1} max={256} step={1} dragPx={3} edit={patternEdit('rows', (pp, v) => resizePattern(pp, v, pp.columns))} />
-            <NumberField label="Rows/beat" value={p().rowsPerBeat} min={1} max={16} step={1} dragPx={10} edit={patternEdit('rows per beat', (pp, v) => ({ ...pp, rowsPerBeat: v }))} />
-            <NumberField label="Columns" value={p().columns} min={1} max={16} step={1} dragPx={10} edit={patternEdit('columns', (pp, v) => resizePattern(pp, pp.rows, v))} />
-            <NumberField label="Swing" value={p().swing * 100} min={0} max={50} step={1} dragPx={3} unit="%" format={(v) => v.toFixed(0)} edit={patternEdit('swing', (pp, v) => ({ ...pp, swing: v / 100 }))} title="Delays every second row; timing only" />
-            <NumberField label="Octave" value={cur().octave} min={0} max={8} step={1} dragPx={10} edit={{ begin() {}, end() {}, change: (v) => setUi('tracker', 'octave', v) }} title="[ and ] change octave" />
-            <NumberField label="Step" value={cur().step} min={0} max={16} step={1} dragPx={10} edit={{ begin() {}, end() {}, change: (v) => setUi('tracker', 'step', v) }} title="Rows to advance after entering a note" />
+            <NumberField
+              label="Rows"
+              value={p().rows}
+              min={1}
+              max={256}
+              step={1}
+              dragPx={3}
+              edit={patternEdit('rows', (pp, v) => resizePattern(pp, v, pp.columns))}
+            />
+            <NumberField
+              label="Rows/beat"
+              value={p().rowsPerBeat}
+              min={1}
+              max={16}
+              step={1}
+              dragPx={10}
+              edit={patternEdit('rows per beat', (pp, v) => ({ ...pp, rowsPerBeat: v }))}
+            />
+            <NumberField
+              label="Columns"
+              value={p().columns}
+              min={1}
+              max={16}
+              step={1}
+              dragPx={10}
+              edit={patternEdit('columns', (pp, v) => resizePattern(pp, pp.rows, v))}
+            />
+            <NumberField
+              label="Swing"
+              value={p().swing * 100}
+              min={0}
+              max={50}
+              step={1}
+              dragPx={3}
+              unit="%"
+              format={(v) => v.toFixed(0)}
+              edit={patternEdit('swing', (pp, v) => ({ ...pp, swing: v / 100 }))}
+              title="Delays every second row; timing only"
+            />
+            <NumberField
+              label="Octave"
+              value={cur().octave}
+              min={0}
+              max={8}
+              step={1}
+              dragPx={10}
+              edit={{ begin() {}, end() {}, change: (v) => setUi('tracker', 'octave', v) }}
+              title="[ and ] change octave"
+            />
+            <NumberField
+              label="Step"
+              value={cur().step}
+              min={0}
+              max={16}
+              step={1}
+              dragPx={10}
+              edit={{ begin() {}, end() {}, change: (v) => setUi('tracker', 'step', v) }}
+              title="Rows to advance after entering a note"
+            />
             <label class="tracker-ins">
               <span class="nf-label">Instrument</span>
               <select
@@ -427,7 +481,8 @@ export function TrackerEditor(props: { clip: PatternClip }) {
             </Index>
           </div>
           <div class="tracker-foot">
-            {p().rows} rows make {patternLengthBeats(p())} beats. This clip plays {props.clip.length.toFixed(2)} beats, starting {props.clip.offset.toFixed(2)} beats into the pattern.
+            {p().rows} rows make {patternLengthBeats(p())} beats. This clip plays {props.clip.length.toFixed(2)} beats, starting {props.clip.offset.toFixed(2)}{' '}
+            beats into the pattern.
           </div>
         </div>
       )}

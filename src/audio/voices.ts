@@ -1,7 +1,8 @@
 // Tracker sampler voices built from native nodes, scheduled sample-accurately
 // on the audio clock: source ─► filter ─► envelope ─► pan ─► destination (+ sends).
-import type { FxCode, Instrument } from '../model/types';
+
 import { dbToGain } from '../model/timing';
+import type { FxCode, Instrument } from '../model/types';
 
 export interface VoiceTargets {
   out: AudioNode;
@@ -29,7 +30,7 @@ export interface Voice {
 }
 
 /** 00..FF → 40 Hz .. 20 kHz, exponential. */
-export const fxCutoff = (v: number) => 40 * Math.pow(500, v / 255);
+export const fxCutoff = (v: number) => 40 * 500 ** (v / 255);
 /** 00..FF → −1 .. +1 with 80 at centre. */
 export const fxPan = (v: number) => Math.max(-1, Math.min(1, (v - 0x80) / 0x7f));
 
@@ -41,7 +42,7 @@ export function startVoice(ctx: BaseAudioContext, targets: VoiceTargets, p: Voic
 
   const src = ctx.createBufferSource();
   src.buffer = buffer;
-  src.playbackRate.value = Math.pow(2, (p.note - ins.rootNote + ins.fineTune / 100) / 12);
+  src.playbackRate.value = 2 ** ((p.note - ins.rootNote + ins.fineTune / 100) / 12);
 
   // Region in buffer time (mirrored when reversed).
   let regionStart = Math.max(0, Math.min(dur, ins.start));

@@ -1,11 +1,12 @@
-import { For, Show, createSignal } from 'solid-js';
-import type { SampleMeta } from '../model/types';
+import { createSignal, For, Show } from 'solid-js';
 import { hex2 } from '../model/tracker';
-import { audio, project, setUi, ui } from '../store/app';
+import type { SampleMeta } from '../model/types';
 import { importFiles, instrumentFromSample, openSample, removeInstrument, removeSample, renameSample, sampleUsage } from '../store/actions';
+import { audio, project, setUi, ui } from '../store/app';
 import { SAMPLE_MIME } from './dnd';
 
-const fmtDur = (s: number) => (s < 10 ? `${s.toFixed(2)}s` : s < 60 ? `${s.toFixed(1)}s` : `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`);
+const fmtDur = (s: number) =>
+  s < 10 ? `${s.toFixed(2)}s` : s < 60 ? `${s.toFixed(1)}s` : `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`;
 
 export function Pool() {
   let input!: HTMLInputElement;
@@ -62,14 +63,9 @@ export function Pool() {
             }}
           />
         </div>
-        <Show
-          when={project.samples.length}
-          fallback={<p class="pool-empty">Drop audio files here or use Import. Recordings and prints appear here too.</p>}
-        >
+        <Show when={project.samples.length} fallback={<p class="pool-empty">Drop audio files here or use Import. Recordings and prints appear here too.</p>}>
           <ul class="pool-list">
-            <For each={project.samples}>
-              {(s) => <SampleRow s={s} playing={auditioning() === s.id} onAudition={() => audition(s.id)} />}
-            </For>
+            <For each={project.samples}>{(s) => <SampleRow s={s} playing={auditioning() === s.id} onAudition={() => audition(s.id)} />}</For>
           </ul>
         </Show>
       </section>
@@ -78,7 +74,10 @@ export function Pool() {
         <div class="pool-head">
           <h2>Instruments</h2>
         </div>
-        <Show when={project.instruments.length} fallback={<p class="pool-empty">Turn a short sample into a tracker instrument with its “Instrument” button.</p>}>
+        <Show
+          when={project.instruments.length}
+          fallback={<p class="pool-empty">Turn a short sample into a tracker instrument with its “Instrument” button.</p>}
+        >
           <ul class="pool-list">
             <For each={project.instruments}>
               {(ins, i) => (
@@ -132,7 +131,13 @@ function SampleRow(props: { s: SampleMeta; playing: boolean; onAudition: () => v
       }}
       title="Drag onto a track"
     >
-      <button type="button" class="icon-btn audition" aria-pressed={props.playing} onClick={props.onAudition} title={props.playing ? 'Stop preview' : 'Preview'}>
+      <button
+        type="button"
+        class="icon-btn audition"
+        aria-pressed={props.playing}
+        onClick={props.onAudition}
+        title={props.playing ? 'Stop preview' : 'Preview'}
+      >
         {props.playing ? '■' : '▶'}
       </button>
       <div class="pool-text">

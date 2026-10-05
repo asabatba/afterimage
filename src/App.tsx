@@ -1,5 +1,5 @@
-import { Show, createEffect, on, onCleanup, onMount } from 'solid-js';
-import { audio, canRedo, canUndo, playing, project, rawProject, redo, selectClips, selectedClipIds, setPlayhead, setUi, toast, ui, undo } from './store/app';
+import { createEffect, on, onCleanup, onMount, Show } from 'solid-js';
+import { groupSpan } from './model/clips';
 import {
   addMarker,
   copySelected,
@@ -14,17 +14,32 @@ import {
   stop,
   togglePlay,
 } from './store/actions';
-import { groupSpan } from './model/clips';
+import {
+  audio,
+  canRedo,
+  canUndo,
+  playhead,
+  playing,
+  project,
+  rawProject,
+  redo,
+  selectClips,
+  selectedClipIds,
+  setPlayhead,
+  setUi,
+  toast,
+  ui,
+  undo,
+} from './store/app';
 import { installAutosave, startSession } from './store/session';
-import { Transport } from './ui/Transport';
-import { Pool } from './ui/Pool';
 import { Arrangement, arrangementView } from './ui/Arrangement';
-import { BottomPanel } from './ui/Detail';
 import { CapturePanel } from './ui/CapturePanel';
+import { setCaptureStatus, setElapsed, setInputInfo, setInputLevels, setMonitoringSignal } from './ui/captureState';
+import { BottomPanel } from './ui/Detail';
 import { Dialogs } from './ui/Dialogs';
 import { setMeters } from './ui/meters';
-import { playhead } from './store/app';
-import { setCaptureStatus, setElapsed, setInputInfo, setInputLevels, setMonitoringSignal } from './ui/captureState';
+import { Pool } from './ui/Pool';
+import { Transport } from './ui/Transport';
 
 function isTyping(el: EventTarget | null) {
   const t = el as HTMLElement | null;
@@ -36,7 +51,12 @@ export function App() {
   const { engine, capture } = audio();
 
   // Push every project change to the audio engine (graph levels, live clip edits).
-  createEffect(on(() => JSON.stringify(project), () => engine.sync(rawProject())));
+  createEffect(
+    on(
+      () => JSON.stringify(project),
+      () => engine.sync(rawProject()),
+    ),
+  );
   installAutosave();
 
   engine.onPlayState((p) => {

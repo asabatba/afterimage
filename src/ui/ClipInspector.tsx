@@ -1,31 +1,26 @@
-import { Show, createEffect, on, onCleanup, onMount, createSignal } from 'solid-js';
+import { createEffect, createSignal, on, onCleanup, onMount, Show } from 'solid-js';
 import { unwrap } from 'solid-js/store';
+import { beatsToSec, clipRate, contentLengthBeats, effectivePitch, formatBBT, MIN_REGION, normalizeClip, regionDuration } from '../model/timing';
+import { noteName } from '../model/tracker';
 import type { AudioClip, Project } from '../model/types';
-import {
-  MIN_REGION,
-  clipRate,
-  contentLengthBeats,
-  effectivePitch,
-  normalizeClip,
-  regionDuration,
-  beatsToSec,
-  formatBBT,
-} from '../model/timing';
-import { beginGesture, endGesture, live, project, samples, samplesVersion, playhead, playing } from '../store/app';
 import { instrumentFromClip, openSample, updateClip } from '../store/actions';
 import { detectRegion, type RegionInfo } from '../store/analysis';
-import { noteName } from '../model/tracker';
-import { NumberField, Segmented, Toggle, bindEdit, fmtSigned } from './controls';
-import { TRACK_COLORS, drawSampleWave, setupCanvas } from './draw';
+import { beginGesture, endGesture, live, playhead, playing, project, samples, samplesVersion } from '../store/app';
+import { bindEdit, fmtSigned, NumberField, Segmented, Toggle } from './controls';
+import { drawSampleWave, setupCanvas, TRACK_COLORS } from './draw';
 
 function clipEdit(id: string, label: string, fn: (c: AudioClip, v: number, p: Project) => void) {
-  return bindEdit(label, (p, v) => {
-    const i = p.clips.findIndex((c) => c.id === id);
-    if (i < 0 || p.clips[i].kind !== 'audio') return;
-    const c = structuredClone(unwrap(p.clips[i])) as AudioClip;
-    fn(c, v, p);
-    p.clips[i] = normalizeClip(c, p.bpm);
-  }, { checkOverlaps: true });
+  return bindEdit(
+    label,
+    (p, v) => {
+      const i = p.clips.findIndex((c) => c.id === id);
+      if (i < 0 || p.clips[i].kind !== 'audio') return;
+      const c = structuredClone(unwrap(p.clips[i])) as AudioClip;
+      fn(c, v, p);
+      p.clips[i] = normalizeClip(c, p.bpm);
+    },
+    { checkOverlaps: true },
+  );
 }
 
 export function ClipInspector(props: { clip: AudioClip }) {
@@ -99,9 +94,39 @@ export function ClipInspector(props: { clip: AudioClip }) {
       <div class="insp-controls">
         <fieldset>
           <legend>Level</legend>
-          <NumberField label="Gain" value={c().gainDb} min={-48} max={24} step={0.1} dragPx={2} unit="dB" format={(v) => fmtSigned(v, 1)} edit={clipEdit(id(), 'gain', (x, v) => (x.gainDb = v))} />
-          <NumberField label="Fade in" value={c().fadeIn} min={0} max={c().length} step={1 / 16} dragPx={3} unit="beats" format={(v) => v.toFixed(2)} edit={clipEdit(id(), 'fade', (x, v) => (x.fadeIn = Math.min(v, x.length - x.fadeOut)))} />
-          <NumberField label="Fade out" value={c().fadeOut} min={0} max={c().length} step={1 / 16} dragPx={3} unit="beats" format={(v) => v.toFixed(2)} edit={clipEdit(id(), 'fade', (x, v) => (x.fadeOut = Math.min(v, x.length - x.fadeIn)))} />
+          <NumberField
+            label="Gain"
+            value={c().gainDb}
+            min={-48}
+            max={24}
+            step={0.1}
+            dragPx={2}
+            unit="dB"
+            format={(v) => fmtSigned(v, 1)}
+            edit={clipEdit(id(), 'gain', (x, v) => (x.gainDb = v))}
+          />
+          <NumberField
+            label="Fade in"
+            value={c().fadeIn}
+            min={0}
+            max={c().length}
+            step={1 / 16}
+            dragPx={3}
+            unit="beats"
+            format={(v) => v.toFixed(2)}
+            edit={clipEdit(id(), 'fade', (x, v) => (x.fadeIn = Math.min(v, x.length - x.fadeOut)))}
+          />
+          <NumberField
+            label="Fade out"
+            value={c().fadeOut}
+            min={0}
+            max={c().length}
+            step={1 / 16}
+            dragPx={3}
+            unit="beats"
+            format={(v) => v.toFixed(2)}
+            edit={clipEdit(id(), 'fade', (x, v) => (x.fadeOut = Math.min(v, x.length - x.fadeIn)))}
+          />
         </fieldset>
 
         <fieldset>
@@ -240,11 +265,7 @@ export function ClipInspector(props: { clip: AudioClip }) {
         </fieldset>
 
         <div class="insp-actions">
-          <button
-            type="button"
-            class="ghost"
-            onClick={() => set('reset pitch & time', { semitones: 0, cents: 0, stretch: 1, timing: 'free', repitch: false })}
-          >
+          <button type="button" class="ghost" onClick={() => set('reset pitch & time', { semitones: 0, cents: 0, stretch: 1, timing: 'free', repitch: false })}>
             Reset pitch & time
           </button>
           <button type="button" class="ghost" onClick={() => instrumentFromClip(id())} title="Use this region as a tracker instrument">
@@ -290,7 +311,8 @@ function RegionEditor(props: { clip: AudioClip; color: string }) {
     e.stopPropagation();
     const id = props.clip.id;
     const x0 = e.clientX;
-    const a0 = props.clip.srcStart, b0 = props.clip.srcEnd;
+    const a0 = props.clip.srcStart,
+      b0 = props.clip.srcEnd;
     const D = dur();
     let moved = false;
     const onMove = (ev: PointerEvent) => {

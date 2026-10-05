@@ -1,12 +1,12 @@
-import { Show, createEffect, createMemo, on } from 'solid-js';
+import { createEffect, createMemo, on, Show } from 'solid-js';
 import { unwrap } from 'solid-js/store';
-import type { AudioClip, Clip, PatternClip } from '../model/types';
-import { clipEnd, effectivePitch, snapBeat, clipRate } from '../model/timing';
-import { trimStart, trimEnd, stretchTo, slip, setFades, effectiveFades, fillClips, groupSpan, repeatClips } from '../model/clips';
-import { patternLengthBeats } from '../model/tracker';
+import { effectiveFades, fillClips, groupSpan, repeatClips, setFades, slip, stretchTo, trimEnd, trimStart } from '../model/clips';
 import { newId } from '../model/project';
+import { clipEnd, clipRate, effectivePitch, snapBeat } from '../model/timing';
+import { patternLengthBeats } from '../model/tracker';
+import type { AudioClip, Clip, PatternClip } from '../model/types';
 import { beginGesture, endGesture, isSelected, live, project, samples, samplesVersion, selectClips, setUi, ui } from '../store/app';
-import { TRACK_COLORS, drawClipWave, drawPatternPreview, setupCanvas } from './draw';
+import { drawClipWave, drawPatternPreview, setupCanvas, TRACK_COLORS } from './draw';
 
 export interface ViewWindow {
   scrollLeft: () => number;
@@ -41,7 +41,8 @@ export function ClipView(props: { clip: Clip; view: ViewWindow }) {
 
   createEffect(
     on(
-      () => [vis(), JSON.stringify(props.clip), ppb(), project.bpm, samplesVersion(), colors(), pattern() && JSON.stringify(pattern()!.cells), waveH()] as const,
+      () =>
+        [vis(), JSON.stringify(props.clip), ppb(), project.bpm, samplesVersion(), colors(), pattern() && JSON.stringify(pattern()!.cells), waveH()] as const,
       () => {
         const v = vis();
         if (!canvas || !v) return;
@@ -112,7 +113,8 @@ export function ClipView(props: { clip: Clip; view: ViewWindow }) {
   };
 
   const startDrag = (e: PointerEvent, mode: Mode, wasSelected: boolean) => {
-    const startX = e.clientX, startY = e.clientY;
+    const startX = e.clientX,
+      startY = e.clientY;
     const bpm = project.bpm;
     const primary = structuredClone(unwrap(props.clip)) as Clip;
     const group: Clip[] =
@@ -120,7 +122,7 @@ export function ClipView(props: { clip: Clip; view: ViewWindow }) {
         ? project.clips.filter((c) => isSelected(c.id)).map((c) => structuredClone(unwrap(c)) as Clip)
         : [primary];
     const trackIds = project.tracks.map((t) => t.id);
-    const sampleDur = (c: Clip) => (c.kind === 'audio' ? project.samples.find((s) => s.id === c.sampleId)?.duration ?? Infinity : Infinity);
+    const sampleDur = (c: Clip) => (c.kind === 'audio' ? (project.samples.find((s) => s.id === c.sampleId)?.duration ?? Infinity) : Infinity);
     const patLen = (c: Clip) => {
       if (c.kind !== 'pattern') return Infinity;
       const p = project.patterns.find((x) => x.id === c.patternId);
@@ -204,7 +206,15 @@ export function ClipView(props: { clip: Clip; view: ViewWindow }) {
       delete document.body.dataset.dragging;
       if (moved) {
         const labels: Record<Mode, string> = {
-          move: 'move', copy: 'copy', slip: 'slip', trimL: 'trim', trimR: 'trim', stretch: 'stretch', fadeIn: 'fade', fadeOut: 'fade', fill: 'repeat',
+          move: 'move',
+          copy: 'copy',
+          slip: 'slip',
+          trimL: 'trim',
+          trimR: 'trim',
+          stretch: 'stretch',
+          fadeIn: 'fade',
+          fadeOut: 'fade',
+          fill: 'repeat',
         };
         if (mode === 'fill') {
           if (made.length) selectClips(made.map((c) => c.id));

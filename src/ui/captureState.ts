@@ -7,4 +7,4 @@ const [inputInfo, setInputInfo] = createSignal<InputInfo | null>(null);
 const [monitoring, setMonitoringSignal] = createSignal(false);
 const [elapsed, setElapsed] = createSignal(0);
 
-export { captureStatus, setCaptureStatus, inputLevels, setInputLevels, inputInfo, setInputInfo, monitoring, setMonitoringSignal, elapsed, setElapsed };
+export { captureStatus, elapsed, inputInfo, inputLevels, monitoring, setCaptureStatus, setElapsed, setInputInfo, setInputLevels, setMonitoringSignal };

@@ -1,13 +1,10 @@
-import type { AudioClip, Instrument, Pattern, PatternClip, Project, SampleMeta, Track } from './types';
 import { contentLengthBeats, normalizeClip } from './timing';
+import type { AudioClip, Instrument, Pattern, PatternClip, Project, SampleMeta, Track } from './types';
 
 let counter = 0;
 export function newId(prefix = ''): string {
   counter = (counter + 1) % 1e6;
-  const rnd =
-    typeof crypto !== 'undefined' && 'randomUUID' in crypto
-      ? crypto.randomUUID().slice(0, 8)
-      : Math.random().toString(36).slice(2, 10);
+  const rnd = typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID().slice(0, 8) : Math.random().toString(36).slice(2, 10);
   return `${prefix}${Date.now().toString(36)}${counter.toString(36)}${rnd}`;
 }
 
@@ -57,13 +54,7 @@ export function createProject(name = 'Untitled collage'): Project {
   };
 }
 
-export function createAudioClip(
-  sample: SampleMeta,
-  trackId: string,
-  start: number,
-  bpm: number,
-  extra: Partial<AudioClip> = {},
-): AudioClip {
+export function createAudioClip(sample: SampleMeta, trackId: string, start: number, bpm: number, extra: Partial<AudioClip> = {}): AudioClip {
   const clip: AudioClip = {
     id: newId('c'),
     kind: 'audio',
