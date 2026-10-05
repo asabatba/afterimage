@@ -1,0 +1,55 @@
+/* AFTERIMAGE design tokens.
+   Charcoal ground, warm ivory ink, muted amber/blue clips. The one loud idea is
+   the misregistered "print" outline: clips carry a thin ivory outline shifted
+   down-right, as if printed from a second plate. Everything else stays quiet. */
+:root {
+  --ink: #ede6d6;
+  --ink-2: #b4ad9f;
+  --ink-3: #7d776d;
+  --ink-4: #57534c;
+
+  --ground: #1f1e1c;
+  --ground-2: #252422;
+  --ground-3: #2c2b28;
+  --ground-sunk: #1a1918;
+  --rule: #3a3834;
+  --rule-soft: #2f2e2b;
+
+  --amber: #bf9152;
+  --amber-ink: #e2c08f;
+  --amber-fill: #3d3226;
+  --amber-wave: #d9b47c;
+  --blue: #7290ab;
+  --blue-ink: #a9c1d6;
+  --blue-fill: #27313b;
+  --blue-wave: #9cb6cc;
+  --sage: #8c9b79;
+  --sage-fill: #2d3328;
+  --rust: #b06c47;
+  --rust-fill: #3a2a22;
+  --ivory-fill: #34322e;
+
+  --rec: #c65a4b;
+  --ok: #8fa37c;
+  --warn: #d0a35a;
+
+  --offset: 2px;
+  --plate: rgba(237, 230, 214, 0.22);
+  --plate-strong: rgba(237, 230, 214, 0.75);
+
+  --sans: 'IBM Plex Sans', system-ui, sans-serif;
+  --mono: 'JetBrains Mono Variable', 'JetBrains Mono', ui-monospace, monospace;
+  --serif: 'Fraunces Variable', 'Fraunces', Georgia, serif;
+
+  --fs-xs: 11px;
+  --fs-s: 12px;
+  --fs-m: 13px;
+  --fs-l: 15px;
+
+  --r: 3px;
+  --header-w: 188px;
+  --pool-w: 236px;
+  --capture-w: 288px;
+  --transport-h: 48px;
+  --ruler-h: 52px;
+}
