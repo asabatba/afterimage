@@ -2118,3 +2118,28 @@ body[data-dragging="fill"] {
 .chop {
   grid-template-columns: minmax(0, 1fr) clamp(300px, 36vw, 540px);
 }
+
+.chop-tap {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  flex-basis: 100%;
+}
+.tap-btn {
+  min-width: 84px;
+  padding: 8px 16px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  touch-action: manipulation;
+  user-select: none;
+}
+.tap-btn:active {
+  background: var(--amber-fill);
+  border-color: var(--amber);
+  color: var(--amber-ink);
+}
+.chop-tap .chop-note b {
+  font: 500 var(--fs-m) var(--mono);
+  color: var(--ink);
+}

@@ -77,3 +77,92 @@ export function sliceBoundaries(grid: BeatGrid | null, onsets: Seconds[], from: 
   // De-duplicate boundaries that collapsed together.
   return out.filter((t, i) => i === 0 || t - out[i - 1] > 0.002);
 }
+
+// ── Tap tempo ────────────────────────────────────────────────────────────
+
+export interface TapFit {
+  bpm: number;
+  /** Time of a bar start (the first tap is taken as beat 1), within the first bar. */
+  offset: Seconds;
+  taps: number;
+  /** RMS distance of the points the fit used from the fitted grid, in ms. */
+  errorMs: number;
+  /** True when the fit was refined using detected hits near the taps. */
+  snapped: boolean;
+}
+
+const medianOf = (a: number[]) => {
+  const s = [...a].sort((x, y) => x - y);
+  const m = s.length >> 1;
+  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+};
+
+/** Least-squares line t = a + k·P through (k, t) points. */
+function lineFit(ks: number[], ts: number[]): { a: number; P: number; rms: number } {
+  const n = ks.length;
+  const mk = ks.reduce((s, v) => s + v, 0) / n;
+  const mt = ts.reduce((s, v) => s + v, 0) / n;
+  let num = 0,
+    den = 0;
+  for (let i = 0; i < n; i++) {
+    num += (ks[i] - mk) * (ts[i] - mt);
+    den += (ks[i] - mk) ** 2;
+  }
+  const P = den > 0 ? num / den : 0;
+  const a = mt - P * mk;
+  let ss = 0;
+  for (let i = 0; i < n; i++) ss += (ts[i] - (a + P * ks[i])) ** 2;
+  return { a, P, rms: Math.sqrt(ss / n) };
+}
+
+/**
+ * Tempo and beat positions from taps made in time with the music. Needs at least four taps at a
+ * steady pace (30–300 bpm); a skipped beat is tolerated. When detected `onsets` line up with the beats
+ * that were tapped, the fit is redone on those (they are exact, taps are human) so the grid lands on
+ * the hits rather than on the tap jitter.
+ */
+export function fitTaps(taps: Seconds[], onsets: Seconds[] = []): TapFit | null {
+  if (taps.length < 4) return null;
+  const t = [...taps].sort((x, y) => x - y);
+  const gaps = t.slice(1).map((v, i) => v - t[i]);
+  let P = medianOf(gaps);
+  if (!(P >= 0.2 && P <= 2)) return null;
+  // Beat index of each tap, counted tap to tap so a slightly wrong period cannot drift the indices.
+  let ks: number[] = [];
+  let fit = { a: t[0], P, rms: 0 };
+  for (let pass = 0; pass < 2; pass++) {
+    ks = [0];
+    for (let i = 1; i < t.length; i++) ks.push(ks[i - 1] + Math.max(1, Math.round(gaps[i - 1] / P)));
+    fit = lineFit(ks, t);
+    P = fit.P;
+  }
+  if (!(P >= 0.2 && P <= 2) || fit.rms > 0.2 * P) return null;
+
+  let { a, rms } = fit;
+  let snapped = false;
+  const kMax = ks[ks.length - 1];
+  const matchedK: number[] = [];
+  const matchedT: number[] = [];
+  for (let k = 0; k <= kMax; k++) {
+    const pred = a + k * P;
+    let best: number | null = null;
+    for (const o of onsets) {
+      if (o < pred - 0.15 * P) continue;
+      if (o > pred + 0.15 * P) break;
+      if (best === null || Math.abs(o - pred) < Math.abs(best - pred)) best = o;
+    }
+    if (best !== null) {
+      matchedK.push(k);
+      matchedT.push(best);
+    }
+  }
+  if (matchedK.length >= Math.max(4, 0.6 * (kMax + 1))) {
+    const refined = lineFit(matchedK, matchedT);
+    if (refined.rms <= rms && refined.P >= 0.2 && refined.P <= 2 && Math.abs(refined.P - P) < 0.03 * P) {
+      ({ a, P, rms } = refined);
+      snapped = true;
+    }
+  }
+  const bar = 4 * P;
+  return { bpm: 60 / P, offset: ((a % bar) + bar) % bar, taps: t.length, errorMs: rms * 1000, snapped };
+}

@@ -16,6 +16,41 @@ npm run build:single   # one self-contained HTML file → dist-single/index.html
 
 Targets current Chromium and Firefox desktop. Verified here in headless Chromium; Firefox has not been run.
 
+## Deploying with CapRover
+
+The root `captain-definition` uses `Dockerfile` to build the app with Node 24 and pnpm,
+then serve `dist/` with Nginx on port **80**. Dependencies are installed from the existing
+lockfile. No backend, environment variables, database or persistent server volumes are required;
+projects and samples remain in the browser's IndexedDB. Changing the site's domain gives it a
+separate browser storage area, so export project bundles before moving to a new domain.
+
+1. Create an app in CapRover (for example, `afterimage`). Leave **Has Persistent Data** unchecked.
+2. Under **HTTP Settings**, set **Container HTTP Port** to `80`. Enable **HTTPS** for the app's
+   domain and **Force HTTPS**; microphone capture and audio worklets require a secure context.
+3. Commit the deployment files and any app changes you want to deploy. The CapRover CLI deploys
+   committed Git files, excluding uncommitted and ignored files.
+4. From the project root, run:
+
+```sh
+npm install -g caprover
+caprover login
+caprover deploy
+```
+
+Select your server, app and branch when prompted. CapRover builds the production image on the
+server. You can also deploy through CapRover's repository integration; use `./captain-definition`
+as the Captain Definition Path. See the [CapRover deployment documentation](https://caprover.com/docs/cli-commands.html).
+
+To check the same image locally with Docker installed:
+
+```sh
+docker build -t afterimage .
+docker run --rm -p 8080:80 afterimage
+```
+
+Open `http://localhost:8080` (localhost is a secure-context exception). Nginx prevents stale
+HTML caching, caches hashed assets, and returns the app for frontend routes.
+
 ## Using it
 
 - **Import** audio in the pool (or drop files on the pool or straight onto a track). Drag pool samples onto tracks.
@@ -32,7 +67,9 @@ Targets current Chromium and Firefox desktop. Verified here in headless Chromium
 - **Sample editor** (click a pool sample, or *Edit*; importing a single file opens it): a zoomable waveform of one
   sample — `Ctrl`+wheel or `+`/`−` zoom, wheel scrolls, the strip underneath is an overview you can drag. Opening a sample
   analyses it (a few seconds for a song) and shows the **beat grid** (tempo and bar lines, editable: ×2, ÷2, *Downbeat +1*,
-  *Beat 1 ← cursor*), **hits** (sensitivity slider) and a **chord strip** with the **key**. Drag to select (snaps to the grid
+  *Beat 1 ← cursor*, or **tap** it yourself: press Play, then tap `T` (or the Tap button) in time, starting on a bar's first
+  beat. Taps are placed in the sample, fitted for tempo and phase, and lined up with the detected hits; a second after you
+  stop, the grid is replaced in one undoable step. Without playback, tapping sets the tempo only), **hits** (sensitivity slider) and a **chord strip** with the **key**. Drag to select (snaps to the grid
   or to hits; `Alt` for free; drag the edges to resize), double-click selects a beat/bar, click a chord to select it.
   `Space` previews the selection (or from the cursor), `L` loops it, `←`/`→` step to the next region. The selection's
   detected **note** (with cents) and **chord** are shown. **Add to timeline** (`Enter`) places it at the cursor and moves

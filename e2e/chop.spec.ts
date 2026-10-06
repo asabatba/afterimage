@@ -287,6 +287,65 @@ test('the grid can be corrected by hand and the pool shows it', async ({ page })
   expect((await state(page)).samples[0].grid.offset).toBeCloseTo(before.offset, 3);
 });
 
+test('tapping along to the preview sets the tempo and the beat positions in one undoable step', async ({ page }) => {
+  await freshApp(page);
+  await importSong(page);
+  const detected = (await state(page)).samples[0].grid;
+  // Break the grid, then repair it by tapping.
+  await page.getByRole('button', { name: '×2' }).click();
+  expect((await state(page)).samples[0].grid.bpm).toBeCloseTo(detected.bpm * 2, 2);
+
+  await page.locator('.chop').getByRole('button', { name: /Play/ }).click();
+  await expect.poll(() => page.evaluate(() => (window as any).__afterimage.audio().engine.auditionPosition())).not.toBeNull();
+  // A tapper that presses T as the playhead crosses each true beat, starting on the second bar's downbeat.
+  await page.evaluate(
+    ({ offset, beat }) => {
+      const el = document.querySelector('.chop') as HTMLElement;
+      const engine = (window as any).__afterimage.audio().engine;
+      let k = 4;
+      const last = k + 15;
+      const step = () => {
+        const pos = engine.auditionPosition();
+        if (pos !== null && pos >= offset + k * beat) {
+          el.dispatchEvent(new KeyboardEvent('keydown', { key: 't', bubbles: true }));
+          k++;
+        }
+        if (k <= last) requestAnimationFrame(step);
+      };
+      requestAnimationFrame(step);
+    },
+    { offset: OFFSET, beat: 60 / BPM },
+  );
+  await expect(page.locator('.chop-tap')).toContainText(/\d+ taps/);
+  // Tapping stops: the grid is applied.
+  await expect.poll(async () => (await state(page)).samples[0].grid.bpm, { timeout: 20_000 }).toBeLessThan(detected.bpm * 1.5);
+  const g = (await state(page)).samples[0].grid;
+  expect(Math.abs(g.bpm - BPM)).toBeLessThan(0.3);
+  const bar = (60 / BPM) * 4;
+  const err = ((((g.offset - OFFSET) % bar) + bar * 1.5) % bar) - bar / 2;
+  expect(Math.abs(err)).toBeLessThan(0.02);
+  await page.locator('.chop').getByRole('button', { name: /Stop/ }).click();
+
+  // One undo takes the whole tap session back.
+  await page.locator('body').press('Control+z');
+  expect((await state(page)).samples[0].grid.bpm).toBeCloseTo(detected.bpm * 2, 2);
+});
+
+test('tap tempo without playback sets only the tempo', async ({ page }) => {
+  await freshApp(page);
+  await importSong(page);
+  const before = (await state(page)).samples[0].grid;
+  const tapButton = page.locator('.chop').getByRole('button', { name: 'Tap', exact: true });
+  for (let i = 0; i < 7; i++) {
+    await tapButton.dispatchEvent('pointerdown', { button: 0 });
+    if (i === 1) await expect(page.locator('.chop-tap')).toContainText('2 taps');
+    await page.waitForTimeout(500);
+  }
+  await expect.poll(async () => Math.abs((await state(page)).samples[0].grid.bpm - 120), { timeout: 20_000 }).toBeLessThan(5);
+  const after = (await state(page)).samples[0].grid;
+  expect(after.offset).toBeCloseTo(before.offset, 6);
+});
+
 test('a pitched sample becomes a tuned instrument; clips report note and chord', async ({ page }) => {
   await freshApp(page);
   await page.setInputFiles('.pool input[type=file]', fixture('pluck-c4.wav'));

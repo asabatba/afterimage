@@ -1,0 +1,13 @@
+.git
+.vscode
+.agents
+.codex
+node_modules
+dist
+dist-single
+test-results
+playwright-report
+.env
+.env.*
+*.log
+*.tar

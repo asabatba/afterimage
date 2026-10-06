@@ -3,7 +3,7 @@
 import { createEffect, createMemo, createSignal, For, on, onCleanup, onMount, Show } from 'solid-js';
 import { channelsOf } from '../audio/samples';
 import { type ChordGuess, chordForRange, detectNote, type NoteEstimate, pickOnsets, refineOnsets } from '../model/analysis';
-import { beatAt, beatSeconds, gridLines, nearestOnset, type SliceMode, sliceBoundaries, snapToGrid, timeOfBeat } from '../model/grid';
+import { beatAt, beatSeconds, fitTaps, gridLines, nearestOnset, type SliceMode, sliceBoundaries, snapToGrid, timeOfBeat } from '../model/grid';
 import { peakSpan } from '../model/peaks';
 import { formatTime } from '../model/timing';
 import { noteName } from '../model/tracker';
@@ -92,6 +92,9 @@ export function ChopEditor(props: { sampleId: string }) {
   const [showChords, setShowChords] = createSignal(true);
   const [sensitivity, setSensitivity] = createSignal(1);
   const [loopPreview, setLoopPreview] = createSignal(false);
+  // Taps made in time with the music: positions in the sample while previewing, wall-clock seconds otherwise.
+  const [taps, setTaps] = createSignal<number[]>([]);
+  const [tapMode, setTapMode] = createSignal<'sample' | 'clock'>('sample');
   const [playPos, setPlayPos] = createSignal<number | null>(null);
   const [trackSel, setTrackSel] = createSignal('auto');
   const [sliceBy, setSliceBy] = createSignal('bar');
@@ -227,6 +230,15 @@ export function ChopEditor(props: { sampleId: string }) {
       }
       for (let i = lo; i < hits.length && hits[i] <= to; i++) g.fillRect(Math.round((hits[i] - from) / perPx), H - 22, 1, 22);
     }
+    if (tapMode() === 'sample') {
+      g.fillStyle = '#e2c08f';
+      for (const t of taps()) {
+        if (t < from || t > to) continue;
+        const x = Math.round((t - from) / perPx);
+        g.fillRect(x, 0, 1, 16);
+        g.fillRect(x - 3, 0, 7, 3);
+      }
+    }
   });
 
   createEffect(() => {
@@ -337,6 +349,48 @@ export function ChopEditor(props: { sampleId: string }) {
   const togglePreview = () => (audio().engine.auditionPosition(id) !== null ? stopPreview() : startPreview());
   createEffect(on(loopPreview, () => audio().engine.auditionPosition(id) !== null && startPreview()));
 
+  // ── Tap tempo ────────────────────────────────────────────────────────────
+  const TAP_IDLE_MS = 1400;
+  const MAX_TAP_GAP = 2.5;
+  let tapTimer: ReturnType<typeof setTimeout> | undefined;
+  onCleanup(() => clearTimeout(tapTimer));
+  const tapFit = createMemo(() => fitTaps(taps(), tapMode() === 'sample' ? onsets() : []));
+
+  /** While the preview plays a tap marks that position in the sample; otherwise it is plain tap tempo. */
+  function tap(eventTime = performance.now()) {
+    const { engine, ctx } = audio();
+    const pos = engine.auditionPosition(id);
+    const mode = pos !== null ? 'sample' : 'clock';
+    // What is heard now left the speakers `latency` ago, and the key press happened before this handler ran.
+    const sinceEvent = Math.max(0, (performance.now() - eventTime) / 1000);
+    const t = pos !== null ? pos - sinceEvent - (ctx.outputLatency ?? 0) - ctx.baseLatency : eventTime / 1000;
+    const prev = taps();
+    const last = prev[prev.length - 1];
+    // A pause, a switch between the two modes, or the preview looping around starts a new count.
+    const fresh = last === undefined || mode !== tapMode() || t - last < -0.05 || t - last > MAX_TAP_GAP;
+    setTapMode(mode);
+    setTaps(fresh ? [t] : [...prev, t]);
+    clearTimeout(tapTimer);
+    tapTimer = setTimeout(applyTaps, TAP_IDLE_MS);
+  }
+
+  /** Once tapping stops, make the result the sample's grid in one undoable step. */
+  function applyTaps() {
+    const f = tapFit();
+    const sampleMode = tapMode() === 'sample';
+    setTaps([]);
+    if (!f) return;
+    const offset = sampleMode ? f.offset : (grid()?.offset ?? cursor() ?? 0);
+    setSampleGrid(id, { bpm: f.bpm, offset }, 'tap tempo');
+    toast(
+      sampleMode
+        ? `Grid set from ${f.taps} taps: ${f.bpm.toFixed(2)} bpm${f.snapped ? ', lined up with the hits' : ''}. The first tap is beat 1 — use Downbeat +1 if the bar is off.`
+        : `Tempo set from ${f.taps} taps: ${f.bpm.toFixed(2)} bpm. Play the sample and tap along to place the beats too.`,
+      'info',
+      4000,
+    );
+  }
+
   // ── Detection readouts for the selection ────────────────────────────────
   const [info, setInfo] = createSignal<{ note: NoteEstimate | null; chord: ChordGuess | null } | null>(null);
   createEffect(
@@ -410,6 +464,9 @@ export function ChopEditor(props: { sampleId: string }) {
       }
       case 'l':
         setLoopPreview(!loopPreview());
+        break;
+      case 't':
+        if (!e.repeat) tap(e.timeStamp);
         break;
       case 'Escape':
         setSel(null);
@@ -673,6 +730,34 @@ export function ChopEditor(props: { sampleId: string }) {
 
         <fieldset>
           <legend>Tempo and beats</legend>
+          <div class="chop-tap">
+            <button
+              type="button"
+              class="ghost tap-btn"
+              onPointerDown={(e) => {
+                e.preventDefault();
+                root.focus();
+                tap(e.timeStamp);
+              }}
+              onClick={(e) => e.detail === 0 && tap()}
+              title="Tap in time with the music (T). While the sample plays, taps place the beats too; the first tap is beat 1."
+            >
+              Tap
+            </button>
+            <span class="chop-note" aria-live="polite">
+              <Show
+                when={taps().length}
+                fallback={
+                  playPos() !== null ? 'Tap along — start on a bar’s first beat.' : 'Press Play, then tap along. Without playback it sets the tempo only.'
+                }
+              >
+                {taps().length} tap{taps().length === 1 ? '' : 's'}
+                <Show when={tapFit()} fallback=" — keep going…">
+                  {(f) => <b> · {f().bpm.toFixed(1)} bpm</b>}
+                </Show>
+              </Show>
+            </span>
+          </div>
           <Show
             when={grid()}
             fallback={
